@@ -144,6 +144,7 @@ typedef struct s_node {
     void* (*entry)(struct s_node*);  // Entry point of the module
     unsigned char status;            // Status of this node
     pthread_t id;                    // Id of the module
+    void* ret;                       // Return value
 
     /* Input flow */    
     unsigned int nb_inslots;         // Number of input slots
@@ -156,6 +157,7 @@ typedef struct s_node {
     /* Edges */
     struct neighbour* neigh;         // Adjacency list
     unsigned int nb_neigh;           // Number of neighbours
+
 
 } *node;
     
@@ -203,5 +205,6 @@ int launch_node(node n);
 int launch_straph(straph s);
 struct inslot_l* new_inslot_l(struct out_buf* b);
 struct inslot_l* new_inslot_c(struct out_buf* b);
+int join_straph(straph s);
 
 #endif

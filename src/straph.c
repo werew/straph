@@ -328,8 +328,48 @@ int launch_node(node n){
 
 
 
+int join_straph(straph s){
+     
+    struct linked_fifo lf;
+    lf_init(&lf);
 
+    /* Init fifo with straph's entries */
+    unsigned int i;
+    for (i = 0; i < s->nb_entries; i++){
+        if (lf_push(&lf, s->entries[i]) == -1) goto error;
+    }
 
+    /* Join nodes */
+    node n = NULL; 
+    while (1){
+
+        /* Pop and join node */
+        n = lf_pop(&lf);
+        if (n == NULL){
+            if (errno == ENOENT) break;
+            goto error;
+        }
+
+        int err = pthread_join(n->id, &n->ret);
+        if (err != 0){
+            errno = err;
+            goto error;
+        }
+
+        /* Collect neighbours */
+        for (i = 0; i < n->nb_neigh; i++){
+            if (n->neigh[i].run_mode != PAR_MODE) continue;
+            if (lf_push(&lf, n->neigh[i].n) == -1) goto error;
+        } 
+    }
+    
+    return 0;
+
+error:
+    lf_drop(&lf);
+    return -1;
+
+}
 
 
 
@@ -376,10 +416,14 @@ error:
 }
 
 
+
+
 void* test(node n){
     printf("hello\n");
     return NULL;
 }
+
+
 
 int main(void){
     straph s = new_straph();
@@ -396,6 +440,7 @@ int main(void){
     
     add_start_node(s, ns[0]);
     launch_straph(s);
+    join_straph(s);
 
     
     return 0;
