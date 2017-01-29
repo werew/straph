@@ -257,8 +257,22 @@ struct inslot_l* new_inslot_c(struct out_buf* b){
 }
 
 void* routine_wrapper(void* n){
-    void* ret = ((node) n)->entry(n);
-    ((node) n)->status = TERMINATED;
+
+    node nd = (node) n;
+    void* ret = nd->entry(n);
+
+    /* Update status */
+    nd->status = TERMINATED;
+
+    /* Free caches */
+    unsigned int i;
+    for (i = 0; i < nd->nb_inslots; i++){
+        struct inslot_c* is = nd->input_slots[i];
+        if (is->src->type == CIR_BUF) {
+            free(is->cache2);
+        }
+    }
+
     return ret;
 }
 
