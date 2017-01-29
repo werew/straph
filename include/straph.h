@@ -206,5 +206,8 @@ int launch_straph(straph s);
 struct inslot_l* new_inslot_l(struct out_buf* b);
 struct inslot_l* new_inslot_c(struct out_buf* b);
 int join_straph(straph s);
+int node_destroy(node n);
+int cbuf_destroy(struct c_buf* b);
+int lbuf_destroy(struct l_buf* b);
 
 #endif

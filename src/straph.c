@@ -262,6 +262,8 @@ void* routine_wrapper(void* n){
     return ret;
 }
 
+
+
 /* returns previous status */
 int launch_node(node n){
 
@@ -371,7 +373,66 @@ error:
 
 }
 
+int lbuf_destroy(struct l_buf* b){
+    free(b->buf);
+    int err = pthread_spin_destroy(&b->of_lock);
+    if (err != 0){
+        errno = err;
+        return -1;
+    }
+    return 0;
+}
 
+int cbuf_destroy(struct c_buf* b){
+    free(b->buf);
+    int err = pthread_mutex_destroy(&b->access_lock);
+    if (err != 0){
+        errno = err;
+        return -1;
+    }
+
+    err = pthread_mutex_destroy(&b->nb_readers_mutex);
+    if (err != 0){
+        errno = err;
+        return -1;
+    }
+    
+    return 0;
+}
+
+int node_destroy(node n){
+    unsigned int i;
+    /* Free input slots */
+    if (n->status != INACTIVE){
+        for (i = 0; i < n->nb_inslots; i++){
+            free(n->input_slots[i]);
+        }
+    }
+
+    /* Destroy out buf */
+    if (n->output.buf != NULL){
+        switch (n->output.type){
+            case LIN_BUF: lbuf_destroy(n->output.buf);
+                break;
+            case CIR_BUF: cbuf_destroy(n->output.buf);
+                break;
+            default: errno = EINVAL;
+                     return -1;  
+        }
+    }
+
+    free(n->neigh);
+
+    int err = pthread_spin_destroy(&n->launch_lock);
+    if (err != 0){
+        errno = err;
+        return -1;
+    }
+
+    free(n);
+
+    return 0;
+}
 
 int launch_straph(straph s){
 
