@@ -147,9 +147,10 @@ struct neighbour {
  *   +----------+
  *
  */
-#define INACTIVE 0
-#define ACTIVE   1
+#define INACTIVE   0
+#define ACTIVE     1
 #define TERMINATED 2
+#define DOOMED     3
 
 /**
  * Main structure representing node

@@ -395,7 +395,7 @@ int join_straph(straph s){
 
         /* Collect neighbours */
         for (i = 0; i < n->nb_neigh; i++){
-            if (n->neigh[i].run_mode != PAR_MODE) continue;
+            if (n->neigh[i].n->status == INACTIVE) continue;
             if (lf_push(&lf, n->neigh[i].n) == -1) goto error;
         } 
     }
@@ -461,6 +461,63 @@ int node_destroy(node n){
 
     return 0;
 }
+
+
+// TODO
+int straph_destroy(straph s){
+    unsigned int i;
+    node n = NULL; 
+    struct linked_fifo lf1,lf2;
+    lf_init(&lf1);
+    lf_init(&lf2);
+
+
+    /* Collect nodes to avoid double frees (collected 
+       nodes are marked with status = DOOMED) */
+
+    
+    for (i = 0; i < s->nb_entries; i++){
+        if (lf_push(&lf1, s->entries[i]) == -1) goto error;
+    }
+    while (1){
+
+        n = lf_pop(&lf1);
+        if (n == NULL){
+            if (errno == ENOENT) break;
+            goto error;
+        }
+
+        /* Skip if already DOOMED  */ 
+        if (n->status == DOOMED) continue;
+
+        /* Set doomed if not doomed */
+        if (lf_push(&lf2, n) == -1) goto error;
+        n->status = DOOMED;
+        
+        /* Collect not neighbours */
+        for (i = 0; i < n->nb_neigh; i++){
+            if (lf_push(&lf1, n->neigh[i].n) == -1) goto error;
+        } 
+    }
+
+    /* Destroy collected nodes */
+    while ((n = lf_pop(&lf2))){
+        if (node_destroy(n) == -1) goto error;
+    }
+    if (errno != ENOENT) goto error;
+
+    /* Free straph */
+    free(s->entries);
+    free(s);
+    
+    return 0;
+
+error:
+    lf_drop(&lf1);
+    lf_drop(&lf2);
+    return -1;
+}
+
 
 int launch_straph(straph s){
 
@@ -530,6 +587,7 @@ int main(void){
     add_start_node(s, ns[0]);
     launch_straph(s);
     join_straph(s);
+    straph_destroy(s);
 
     
     return 0;
