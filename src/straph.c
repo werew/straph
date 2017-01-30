@@ -378,6 +378,9 @@ int join_straph(straph s){
             goto error;
         }
 
+        /* Once joined return inactive */
+        n->status = INACTIVE;
+
         /* Collect neighbours */
         for (i = 0; i < n->nb_neigh; i++){
             if (n->neigh[i].run_mode != PAR_MODE) continue;
