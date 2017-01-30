@@ -128,7 +128,25 @@ struct neighbour {
     unsigned char run_mode; // Run mode of the neighbour
 };
 
-/* Node status */
+/**
+ * Node lifecycle:
+ *   +----------+
+ *   | INACTIVE |<---+
+ *   +----+-----+    |
+ *        |          |
+ *   launch_straph   | 
+ *        |          |
+ *   +----v-----+    |
+ *   |  ACTIVE  |    | join_straph
+ *   +----+-----+    |
+ *        |          |
+ *  thread returns   |
+ *        |          |
+ *   +----v-----+    |
+ *   |TERMINATED+----+
+ *   +----------+
+ *
+ */
 #define INACTIVE 0
 #define ACTIVE   1
 #define TERMINATED 2
