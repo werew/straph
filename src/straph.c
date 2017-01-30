@@ -122,24 +122,38 @@ struct c_buf* new_cbuf(size_t sizebuf){
     return b;
 }
 
-
+/* Results are indefined if set_buffer on node != INACTIVE */
 int set_buffer(node n, unsigned char buftype, size_t bufsize){
-    
+
+    /* Create new buffer */
+    void* newbuf;
     switch (buftype){
-        case CIR_BUF: 
-                n->output.buf = new_cbuf(bufsize);
+        case CIR_BUF: newbuf = new_cbuf(bufsize);
             break;
-        case LIN_BUF:
-                n->output.buf = new_lbuf(bufsize);
+        case LIN_BUF: newbuf = new_lbuf(bufsize);
             break;
-        default:
-                errno = EINVAL;
-                return -1;
+        default: errno = EINVAL;
+                 return -1;
     }
 
-    if (n->output.buf == NULL) return -1;
+    if (newbuf == NULL) return -1;
 
+
+    /* Free old buffer */
+    if (n->output.buf != NULL){
+        switch (n->output.type){
+            case LIN_BUF: lbuf_destroy(n->output.buf);
+                break;
+            case CIR_BUF: cbuf_destroy(n->output.buf);
+                break;
+            default: errno = EINVAL;
+                     return -1;  
+        }
+    }
+
+    /* Update buff */
     n->output.type = buftype;
+    n->output.buf  = newbuf;
 
     return 0;
 }
@@ -285,8 +299,6 @@ void* routine_wrapper(void* n){
 
 /* returns previous status */
 int launch_node(node n){
-
-    // TODO deal with re-launch
 
     /* Lock the node */
     int err;
