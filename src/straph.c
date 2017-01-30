@@ -449,6 +449,7 @@ int node_destroy(node n){
         }
     }
 
+    free(n->input_slots);
     free(n->neigh);
 
     int err = pthread_spin_destroy(&n->launch_lock);
