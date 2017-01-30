@@ -264,14 +264,19 @@ void* routine_wrapper(void* n){
     /* Update status */
     nd->status = TERMINATED;
 
-    /* Free caches */
+    /* Free input slots */
     unsigned int i;
     for (i = 0; i < nd->nb_inslots; i++){
         struct inslot_c* is = nd->input_slots[i];
-        if (is->src->type == CIR_BUF) {
+        struct out_buf* src = is->src;         
+        if (src->type == CIR_BUF) {
             free(is->cache2);
         }
+        free(is);
+        nd->input_slots[i] = src;   // Restore src
     }
+
+    // TODO launch neighbours
 
     return ret;
 }
@@ -280,6 +285,8 @@ void* routine_wrapper(void* n){
 
 /* returns previous status */
 int launch_node(node n){
+
+    // TODO deal with re-launch
 
     /* Lock the node */
     int err;
@@ -332,7 +339,6 @@ int launch_node(node n){
 
     /* Update status and leave*/
     n->status = ACTIVE;
-
     if ((err = pthread_spin_unlock(&n->launch_lock)) != 0) {
         errno = err;
         return -1;
@@ -415,13 +421,6 @@ int cbuf_destroy(struct c_buf* b){
 }
 
 int node_destroy(node n){
-    unsigned int i;
-    /* Free input slots */
-    if (n->status != INACTIVE){
-        for (i = 0; i < n->nb_inslots; i++){
-            free(n->input_slots[i]);
-        }
-    }
 
     /* Destroy out buf */
     if (n->output.buf != NULL){
