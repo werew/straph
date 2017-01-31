@@ -168,7 +168,9 @@ typedef struct s_node {
     /* Input flow */    
     unsigned int nb_inslots;         // Number of input slots
     void ** input_slots;             // Pointers to the output buffers
-                                     // of the source nodes
+                                     // of the source nodes when not active.
+                                     // Pointers to the input slots
+                                     // when active
 
     /* Output flow */    
     struct out_buf output;           // Output buffer
