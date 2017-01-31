@@ -158,11 +158,11 @@ int set_buffer(node n, unsigned char buftype, size_t bufsize){
     return 0;
 }
 
-int link_nodes(node a, node b, unsigned char mode){
+int link_nodes(node a, node b, unsigned int islot, unsigned char mode){
 
     // Add neighbour to 'a' and set the mode
     void* tmp = realloc(a->neigh, (a->nb_neigh+1)*
-                sizeof(struct neighbour));
+                 sizeof(struct neighbour));
     if (tmp == NULL) return -1;
     a->neigh = tmp;
     a->neigh[a->nb_neigh].n = b;
@@ -170,12 +170,20 @@ int link_nodes(node a, node b, unsigned char mode){
 
 
     // Add a new input slot to 'b'
-    tmp = realloc(b->input_slots, (b->nb_inslots+1)*
-                     sizeof(struct s_node*));
-    if (tmp == NULL){a->nb_neigh--; return -1;}
+    if (b->nb_inslots <= islot){
+        // Realloc if islot is beyond the capacity
+        tmp = realloc(b->input_slots, (islot+1)*sizeof(void*));
+        if (tmp == NULL){a->nb_neigh--; return -1;}
 
-    b->input_slots = tmp;
-    b->input_slots[b->nb_inslots++] = &a->output;
+        // Set to NULL all new slots
+        memset((void**) tmp + b->nb_inslots, 0,
+                (islot+1 - b->nb_inslots)*sizeof(void*));
+
+        b->input_slots = tmp;
+        b->nb_inslots = islot+1;
+    }
+
+    b->input_slots[islot] = &a->output;
 
     return 0;
 }
@@ -282,11 +290,14 @@ void* routine_wrapper(void* n){
     unsigned int i;
     for (i = 0; i < nd->nb_inslots; i++){
         struct inslot_c* is = nd->input_slots[i];
+        if (is == NULL) continue;
+
         struct out_buf* src = is->src;         
         if (src->type == CIR_BUF) {
             free(is->cache2);
         }
         free(is);
+
         nd->input_slots[i] = src;   // Restore src
     }
 
@@ -318,6 +329,9 @@ int launch_node(node n){
     unsigned int i;
     for (i = 0; i < n->nb_inslots; i++){
         void* islot;
+
+        if (n->input_slots[i] == NULL) continue;
+
         switch (((struct out_buf*)n->input_slots[i])->type){
             case LIN_BUF:
                 islot = new_inslot_l((struct out_buf*) n->input_slots[i]);
@@ -582,7 +596,7 @@ int main(void){
     } 
 
     for (i=0; i<9; i++){
-        link_nodes(ns[i],ns[i+1],PAR_MODE);
+        link_nodes(ns[i],ns[i+1],0,PAR_MODE);
     }
     
     add_start_node(s, ns[0]);

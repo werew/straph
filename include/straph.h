@@ -214,7 +214,6 @@ int set_buffer(node n, unsigned char buftype, size_t bufsize);
 int add_start_node(straph g, node n);
 struct l_buf* new_lbuf(size_t sizebuf);
 struct c_buf* new_cbuf(size_t sizebuf);
-int link_nodes(node a, node b, unsigned char mode);
 void lf_init(struct linked_fifo* lf);
 int lf_push(struct linked_fifo* lf, void* el);
 void* lf_pop(struct linked_fifo* lf);
@@ -228,5 +227,6 @@ int join_straph(straph s);
 int node_destroy(node n);
 int cbuf_destroy(struct c_buf* b);
 int lbuf_destroy(struct l_buf* b);
+int link_nodes(node a, node b, unsigned int islot, unsigned char mode);
 
 #endif
