@@ -131,12 +131,12 @@ int set_buffer(node n, unsigned int idx_buf,
     if (n->nb_outbufs <= idx_buf){
         // Realloc if idx_buf is beyond the capacity
         struct out_buf* tmp = realloc(n->output_buffers, 
-                    (idx_buf+1)*sizeof(struct out_buf*));
+                    (idx_buf+1)*sizeof(struct out_buf));
         if (tmp == NULL) return -1;
 
         // Set to NULL all new slots
         memset(tmp + n->nb_outbufs, 0,(idx_buf+1-n->nb_outbufs)*
-                sizeof(struct out_buf*));
+                sizeof(struct out_buf));
 
         n->output_buffers = tmp;
         n->nb_outbufs = idx_buf+1;
