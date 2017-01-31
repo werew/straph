@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h> //per sleep
 #include "straph.h"
 
+// TODO set better naming conventions
+// TODO improve code readablility 
 
 straph new_straph(void){
     straph s = calloc(1, sizeof (struct s_straph));
@@ -123,7 +124,23 @@ struct c_buf* new_cbuf(size_t sizebuf){
 }
 
 /* Results are indefined if set_buffer on node != INACTIVE */
-int set_buffer(node n, unsigned char buftype, size_t bufsize){
+int set_buffer(node n, unsigned int idx_buf, 
+               unsigned char buftype, size_t bufsize){
+
+    /* Increase array size if necessary */
+    if (n->nb_outbufs <= idx_buf){
+        // Realloc if idx_buf is beyond the capacity
+        struct out_buf* tmp = realloc(n->output_buffers, 
+                    (idx_buf+1)*sizeof(struct out_buf*));
+        if (tmp == NULL) return -1;
+
+        // Set to NULL all new slots
+        memset(tmp + n->nb_outbufs, 0,(idx_buf+1-n->nb_outbufs)*
+                sizeof(struct out_buf*));
+
+        n->output_buffers = tmp;
+        n->nb_outbufs = idx_buf+1;
+    }
 
     /* Create new buffer */
     void* newbuf;
@@ -135,30 +152,35 @@ int set_buffer(node n, unsigned char buftype, size_t bufsize){
         default: errno = EINVAL;
                  return -1;
     }
-
     if (newbuf == NULL) return -1;
 
 
     /* Free old buffer */
-    if (n->output.buf != NULL){
-        switch (n->output.type){
-            case LIN_BUF: lbuf_destroy(n->output.buf);
+    if (n->output_buffers[idx_buf].buf != NULL){
+        switch (n->output_buffers[idx_buf].type){
+            case LIN_BUF: lbuf_destroy(n->output_buffers[idx_buf].buf);
                 break;
-            case CIR_BUF: cbuf_destroy(n->output.buf);
+            case CIR_BUF: cbuf_destroy(n->output_buffers[idx_buf].buf);
                 break;
-            default: errno = EINVAL;
+            default: free(newbuf);
+                     errno = EINVAL;
                      return -1;  
         }
     }
 
     /* Update buff */
-    n->output.type = buftype;
-    n->output.buf  = newbuf;
+    n->output_buffers[idx_buf].type = buftype;
+    n->output_buffers[idx_buf].buf  = newbuf;
 
     return 0;
 }
 
-int link_nodes(node a, node b, unsigned int islot, unsigned char mode){
+
+
+// TODO function to link nodes without IO
+
+int link_nodes(node a, unsigned int idx_buf, 
+               node b, unsigned int islot, unsigned char mode){
 
     // Add neighbour to 'a' and set the mode
     void* tmp = realloc(a->neigh, (a->nb_neigh+1)*
@@ -183,7 +205,7 @@ int link_nodes(node a, node b, unsigned int islot, unsigned char mode){
         b->nb_inslots = islot+1;
     }
 
-    b->input_slots[islot] = &a->output;
+    b->input_slots[islot] = &a->output_buffers[idx_buf];
 
     return 0;
 }
@@ -450,16 +472,22 @@ int cbuf_destroy(struct c_buf* b){
 }
 
 int node_destroy(node n){
+    unsigned int i;
 
-    /* Destroy out buf */
-    if (n->output.buf != NULL){
-        switch (n->output.type){
-            case LIN_BUF: lbuf_destroy(n->output.buf);
-                break;
-            case CIR_BUF: cbuf_destroy(n->output.buf);
-                break;
-            default: errno = EINVAL;
-                     return -1;  
+    /* Destroy out bufs */
+    if (n->output_buffers != NULL){
+        for (i = 0; i < n->nb_outbufs; i++){
+        
+            if (n->output_buffers[i].buf == NULL) continue;
+
+            switch (n->output_buffers[i].type){
+                case LIN_BUF: lbuf_destroy(n->output_buffers[i].buf);
+                    break;
+                case CIR_BUF: cbuf_destroy(n->output_buffers[i].buf);
+                    break;
+                default: errno = EINVAL;
+                         return -1;  
+            }
         }
     }
 
@@ -596,7 +624,8 @@ int main(void){
     } 
 
     for (i=0; i<9; i++){
-        link_nodes(ns[i],ns[i+1],0,PAR_MODE);
+        set_buffer(ns[i], 0, LIN_BUF, 1); //XXX this should not be necessary
+        link_nodes(ns[i],0,ns[i+1],0,PAR_MODE);
     }
     
     add_start_node(s, ns[0]);

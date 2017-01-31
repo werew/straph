@@ -173,7 +173,9 @@ typedef struct s_node {
                                      // when active
 
     /* Output flow */    
-    struct out_buf output;           // Output buffer
+    unsigned int nb_outbufs;         // Number of output buffers
+    struct out_buf* output_buffers;  // Output buffers
+
 
     /* Edges */
     struct neighbour* neigh;         // Adjacency list
@@ -212,7 +214,6 @@ struct linked_fifo {
 
 straph new_straph(void);
 node new_node(void* (*entry)(node));
-int set_buffer(node n, unsigned char buftype, size_t bufsize);
 int add_start_node(straph g, node n);
 struct l_buf* new_lbuf(size_t sizebuf);
 struct c_buf* new_cbuf(size_t sizebuf);
@@ -229,6 +230,9 @@ int join_straph(straph s);
 int node_destroy(node n);
 int cbuf_destroy(struct c_buf* b);
 int lbuf_destroy(struct l_buf* b);
-int link_nodes(node a, node b, unsigned int islot, unsigned char mode);
+int set_buffer(node n, unsigned int idx_buf, 
+               unsigned char buftype, size_t bufsize);
+int link_nodes(node a, unsigned int idx_buf, 
+               node b, unsigned int islot, unsigned char mode);
 
 #endif
