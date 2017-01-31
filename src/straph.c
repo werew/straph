@@ -300,6 +300,8 @@ struct inslot_l* new_inslot_c(struct out_buf* b){
     return is;
 }
 
+
+// XXX what about ret in case of error ??
 void* routine_wrapper(void* n){
 
     node nd = (node) n;
@@ -323,7 +325,41 @@ void* routine_wrapper(void* n){
         nd->input_slots[i] = src;   // Restore src
     }
 
-    // TODO launch neighbours
+    /* Launch inactives neighbours */
+    struct linked_fifo lf;
+    lf_init(&lf);
+
+    /* Init with current node's neighbours */
+    for (i = 0; i < nd->nb_neigh; i++){
+        if (lf_push(&lf, nd->neigh[i].n) == -1){
+            lf_drop(&lf);
+            return ret;
+        }
+    } 
+
+    node new_nd = NULL;
+    while (1){
+
+
+        /* Pop and launch node */
+        new_nd = lf_pop(&lf);
+        if (new_nd == NULL){
+            if (errno == ENOENT) break;
+            lf_drop(&lf);
+            return ret;
+        }
+
+
+        if (launch_node(new_nd) == INACTIVE){
+            /* Collect node's neighbours */
+            for (i = 0; i < new_nd->nb_neigh; i++){
+                if (lf_push(&lf, new_nd->neigh[i].n) == -1){
+                    lf_drop(&lf);
+                    return ret;
+                }
+            } 
+        }
+    }
 
     return ret;
 }
@@ -451,6 +487,7 @@ int lbuf_destroy(struct l_buf* b){
         errno = err;
         return -1;
     }
+    free(b);
     return 0;
 }
 
@@ -489,6 +526,8 @@ int node_destroy(node n){
                          return -1;  
             }
         }
+
+        free(n->output_buffers);
     }
 
     free(n->input_slots);
