@@ -240,4 +240,11 @@ int set_buffer(node n, unsigned int idx_buf,
 int link_nodes(node a, unsigned int idx_buf, 
                node b, unsigned int islot, unsigned char mode);
 
+int rw_spinlock_rlock(rw_spinlock l);
+int rw_spinlock_runlock(rw_spinlock l);
+int rw_spinlock_wlock(rw_spinlock l);
+int rw_spinlock_wunlock(rw_spinlock l);
+int rw_spinlock_init(rw_spinlock* l);
+int rw_spinlock_destroy(rw_spinlock l);
+
 #endif
