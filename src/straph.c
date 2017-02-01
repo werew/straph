@@ -403,8 +403,8 @@ void* routine_wrapper(void* n){
         if (launch_node(new_nd) == INACTIVE){
             /* Collect node's neighbours */
             for (i = 0; i < new_nd->nb_neigh; i++){
+                if (new_nd->neigh[i].run_mode != PAR_MODE) continue;
                 if (lf_push(&lf, new_nd->neigh[i].n) == -1){
-                    // TODO fix must stop PAR mode if deeper than one level
                     lf_drop(&lf);
                     return ret;
                 }
@@ -715,7 +715,7 @@ int main(void){
 
     for (i=0; i<9; i++){
         set_buffer(ns[i], 0, LIN_BUF, 1); //XXX this should not be necessary
-        link_nodes(ns[i],0,ns[i+1],0,SEQ_MODE);
+        link_nodes(ns[i],0,ns[i+1],0, SEQ_MODE);
     }
     
     add_start_node(s, ns[0]);
