@@ -350,6 +350,33 @@ struct inslot_l* new_inslot_c(struct out_buf* b){
     return is;
 }
 
+int launcher(struct linked_fifo* lf){
+
+    unsigned int i;
+    node n;
+
+    while (1){
+        /* Pop and launch node */
+        if ((n = lf_pop(lf)) == NULL){
+            if (errno == ENOENT) break;
+            return -1;
+        }
+        if (launch_node(n) != INACTIVE) continue;
+
+        /* Collect node's neighbours */
+        for (i = 0; i < n->nb_neigh; i++){
+            // If the running mode is parallel,
+            // add the node to the list
+            if (n->neigh[i].run_mode != PAR_MODE) continue;
+           
+            if (lf_push(lf, n->neigh[i].n) == -1){
+                return -1;
+            }
+        } 
+    }
+    
+    return 0;
+}
 
 // XXX what about ret in case of error ??
 void* routine_wrapper(void* n){
@@ -387,30 +414,7 @@ void* routine_wrapper(void* n){
         }
     } 
 
-    node new_nd = NULL;
-    while (1){
-
-
-        /* Pop and launch node */
-        new_nd = lf_pop(&lf);
-        if (new_nd == NULL){
-            if (errno == ENOENT) break;
-            lf_drop(&lf);
-            return ret;
-        }
-
-
-        if (launch_node(new_nd) == INACTIVE){
-            /* Collect node's neighbours */
-            for (i = 0; i < new_nd->nb_neigh; i++){
-                if (new_nd->neigh[i].run_mode != PAR_MODE) continue;
-                if (lf_push(&lf, new_nd->neigh[i].n) == -1){
-                    lf_drop(&lf);
-                    return ret;
-                }
-            } 
-        }
-    }
+    if (launcher(&lf) == -1) lf_drop(&lf);
 
     return ret;
 }
@@ -659,38 +663,18 @@ int launch_straph(straph s){
     /* Init fifo with straph's entries */
     unsigned int i;
     for (i = 0; i < s->nb_entries; i++){
-        if (lf_push(&lf, s->entries[i]) == -1) goto error;
+        if (lf_push(&lf, s->entries[i]) == -1){
+            lf_drop(&lf);
+            return -1;
+        }
     }
 
-    /* Launch nodes */
-    node n = NULL; 
-    while (1){
-
-        /* Pop and launch node */
-        n = lf_pop(&lf);
-        if (n == NULL){
-            if (errno == ENOENT) break;
-            goto error;
-        }
-        puts("------->");
-        switch(launch_node(n)) {
-            case -1: goto error;
-            case INACTIVE: break;
-            default: continue;
-        }
-
-        /* Collect neighbours */
-        for (i = 0; i < n->nb_neigh; i++){
-            if (n->neigh[i].run_mode != PAR_MODE) continue;
-            if (lf_push(&lf, n->neigh[i].n) == -1) goto error;
-        } 
+    if (launcher(&lf) == -1){
+        lf_drop(&lf);
+        return -1;
     }
-    
+
     return 0;
-
-error:
-    lf_drop(&lf);
-    return -1;
 }
 
 
