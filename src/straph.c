@@ -14,8 +14,31 @@ straph new_straph(void){
     return s;
 }
 
-/*
-ssize_t write(node n, unsigned int slot, 
+ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
+
+    // Calculate max write capability 
+    // Note that the writer has full read-access to 
+    // of_size because it's the only potential writer
+    size_t space_available = lb->sizebuf-lb->of_empty;
+    size_t write_size = (space_available < nbyte)? 
+                         space_available : nbyte;
+
+    if (write_size == 0) return nbyte;
+
+    printf("Writing: %ld bytes\n", write_size);
+
+    memcpy(&lb->buf[lb->of_empty], buf, write_size);
+    
+    // Update offset
+    if (rw_spinlock_wlock(lb->lock)   == -1) return -1;
+    lb->of_empty += write_size;
+    if (rw_spinlock_wunlock(lb->lock) == -1) return -1;
+    
+    return nbyte; 
+}
+
+
+ssize_t st_write(node n, unsigned int slot, 
               const void* buf, size_t nbyte){
 
     // XXX should a node detect NULL buffers ?
@@ -27,13 +50,13 @@ ssize_t write(node n, unsigned int slot,
         return nbyte;
     }
 
-    switch (o.type){
+    switch (n->output_buffers[slot].type){
         case LIN_BUF: 
             return write_lb(n->output_buffers[slot].buf,
                             buf, nbyte);
         case CIR_BUF: 
-            return write_cb(n->output_buffers[slot].buf,
-                            buf, nbyte);
+            return 0; //write_cb(n->output_buffers[slot].buf,
+                       //     buf, nbyte);
         default: 
             errno = EINVAL;
             return -1;
@@ -41,13 +64,7 @@ ssize_t write(node n, unsigned int slot,
 }
 
 
-ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
 
-    if (lb->buf == NULL) return 0;
-
-}
-
-*/
 
 
 /**
@@ -387,6 +404,7 @@ void* routine_wrapper(void* n){
             /* Collect node's neighbours */
             for (i = 0; i < new_nd->nb_neigh; i++){
                 if (lf_push(&lf, new_nd->neigh[i].n) == -1){
+                    // TODO fix must stop PAR mode if deeper than one level
                     lf_drop(&lf);
                     return ret;
                 }
@@ -416,6 +434,7 @@ int launch_node(node n){
         return status;
     }
 
+    puts("Launch");
     /* Create input slots */
     unsigned int i;
     for (i = 0; i < n->nb_inslots; i++){
@@ -653,7 +672,7 @@ int launch_straph(straph s){
             if (errno == ENOENT) break;
             goto error;
         }
-
+        puts("------->");
         switch(launch_node(n)) {
             case -1: goto error;
             case INACTIVE: break;
@@ -679,6 +698,7 @@ error:
 
 void* test(node n){
     printf("hello\n");
+    st_write(n,0,"aaa",4);
     return NULL;
 }
 
