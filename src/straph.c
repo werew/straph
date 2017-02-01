@@ -7,12 +7,159 @@
 // TODO set better naming conventions
 // TODO improve code readablility 
 
+
+
+int rw_spinlock_rlock(rw_spinlock l){
+    int err;
+
+    // Lock r
+    if ((err = pthread_spin_lock(&l.r)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    // Lock w if this is the first reader
+    if (++l.n_r == 1){
+        if ((err = pthread_spin_lock(&l.w)) != 0){
+            pthread_spin_unlock(&l.r);
+            errno = err;
+            return -1;
+        }
+    }
+
+    // Unlock r
+    if ((err = pthread_spin_unlock(&l.r)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    return 0;
+}
+
+int rw_spinlock_runlock(rw_spinlock l){
+    int err;
+
+    // Lock r
+    if ((err = pthread_spin_lock(&l.r)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    // Unlock w if this is the last reader
+    if (--l.n_r == 0){
+        if ((err = pthread_spin_unlock(&l.w)) != 0){
+            pthread_spin_unlock(&l.r);
+            errno = err;
+            return -1;
+        }
+    }
+
+    // Unlock r
+    if ((err = pthread_spin_unlock(&l.r)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    return 0;
+}
+    
+
+int rw_spinlock_wlock(rw_spinlock l){
+    // Lock w
+    int err;
+    if ((err = pthread_spin_lock(&l.w)) != 0){
+        errno = err;
+        return -1;
+    }
+    return 0;
+}
+
+int rw_spinlock_wunlock(rw_spinlock l){
+    // Unlock w
+    int err;
+    if ((err = pthread_spin_unlock(&l.w)) != 0){
+        errno = err;
+        return -1;
+    }
+    return 0;
+}
+    
+int rw_spinlock_init(rw_spinlock* l){
+
+    int err;
+    if ((err = pthread_spin_init(&l->r, 
+               PTHREAD_PROCESS_PRIVATE)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    if ((err = pthread_spin_init(&l->w,
+               PTHREAD_PROCESS_PRIVATE)) != 0){
+        pthread_spin_destroy(&l->r);
+        errno = err;
+        return -1;
+    }
+
+    l->n_r = 0;
+
+    return 0;
+}
+
+int rw_spinlock_destroy(rw_spinlock l){
+
+    int err;
+    if ((err = pthread_spin_destroy(&l.r)) != 0 ||
+        (err = pthread_spin_destroy(&l.w)) != 0 ){
+        errno = err;
+        return -1;
+    }
+
+    return 0;
+}
+
+
+
 straph new_straph(void){
     straph s = calloc(1, sizeof (struct s_straph));
     if (s == NULL) return NULL;
 
     return s;
 }
+
+/*
+ssize_t write(node n, unsigned int slot, 
+              const void* buf, size_t nbyte){
+
+    // XXX should a node detect NULL buffers ?
+
+    // If no slot is available (user choice) 
+    // act as the write was successful 
+    if (n->nb_outbufs <= slot               ||
+        n->output_buffers[slot].buf == NULL ){
+        return nbyte;
+    }
+
+    switch (o.type){
+        case LIN_BUF: 
+            return write_lb(n->output_buffers[slot].buf,
+                            buf, nbyte);
+        case CIR_BUF: 
+            return write_cb(n->output_buffers[slot].buf,
+                            buf, nbyte);
+        default: 
+            errno = EINVAL;
+            return -1;
+    }
+}
+
+
+ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
+
+    if (lb->buf == NULL) return 0;
+
+}
+
+*/
 
 
 /**
@@ -72,9 +219,7 @@ struct l_buf* new_lbuf(size_t sizebuf){
     b->sizebuf = sizebuf;
     b->of_empty = 0;
 
-    int err;
-    if ((err = pthread_spin_init(&b->of_lock,
-                   PTHREAD_PROCESS_PRIVATE)) != 0){
+    if (rw_spinlock_init(&b->lock) == -1){
         free(b->buf);
         free(b);
         return NULL;
@@ -481,12 +626,10 @@ error:
 }
 
 int lbuf_destroy(struct l_buf* b){
-    free(b->buf);
-    int err = pthread_spin_destroy(&b->of_lock);
-    if (err != 0){
-        errno = err;
+    if (rw_spinlock_destroy(b->lock) == -1){
         return -1;
     }
+    free(b->buf);
     free(b);
     return 0;
 }
@@ -664,7 +807,7 @@ int main(void){
 
     for (i=0; i<9; i++){
         set_buffer(ns[i], 0, LIN_BUF, 1); //XXX this should not be necessary
-        link_nodes(ns[i],0,ns[i+1],0,PAR_MODE);
+        link_nodes(ns[i],0,ns[i+1],0,SEQ_MODE);
     }
     
     add_start_node(s, ns[0]);

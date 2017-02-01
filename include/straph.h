@@ -3,6 +3,11 @@
 
 #include <pthread.h>
 
+typedef struct rw_slock {
+    unsigned int n_r;     // Readers count
+    pthread_spinlock_t r; // Lock for readers count
+    pthread_spinlock_t w; // Writer lock
+} rw_spinlock;
 
 
 /******************** Node's output *********************/
@@ -26,11 +31,12 @@ struct out_buf {
  * out of the capacity of the buffer shall be ignored.
  */
 struct l_buf {
-    char* buf;                  // Pointer to the buf 
-    unsigned int sizebuf;       // Size of the buf
-    unsigned int of_empty;      // Offset to the unwritten zone
-    pthread_spinlock_t of_lock; // Regulate of_empty access
+    char* buf;             // Pointer to the buf 
+    unsigned int sizebuf;  // Size of the buf
+    unsigned int of_empty; // Offset to the unwritten zone
+    rw_spinlock lock;      // Readers-writer lock to regulate of_empty access
 };
+
 
 /**
  * Circular buffer:
