@@ -3,14 +3,31 @@
 
 #include <pthread.h>
 
+
+
+/**************** Useful datatypes  ******************/
+
+/* Linked fifo's cell */
+struct lf_cell {
+    void* element;         // Content of the cell
+    struct lf_cell* next;  // Next linked cell
+};
+
+/* Linked fifo */
+struct linked_fifo {
+    struct lf_cell* first; // Least recent cell of the list
+    struct lf_cell* last;  // Most recent cell of the list
+};
+
+/* Spinlock-based readers-writer lock */
 typedef struct rw_slock {
-    unsigned int n_r;     // Readers count
-    pthread_spinlock_t r; // Lock for readers count
-    pthread_spinlock_t w; // Writer lock
+    unsigned int n_r;      // Readers count
+    pthread_spinlock_t r;  // Lock for readers count
+    pthread_spinlock_t w;  // Writer lock
 } rw_spinlock;
 
 
-/******************** Node's output *********************/
+/**************** Node's output buffers ******************/
 
 /* Buffer types */
 #define CIR_BUF  0 
@@ -67,11 +84,7 @@ struct c_buf {
 
 
 
-
-
-
-
-/******************** Node's input *********************/
+/******************** Node's input slots *********************/
 
 /**
  * The input slots are used to perform and
@@ -108,11 +121,6 @@ struct inslot_c {
     unsigned int size_cache2; // Size of the cache2
 
 };
-
-
-
-
-
 
 
 
@@ -206,15 +214,6 @@ typedef struct s_straph {
 
 
 
-struct lf_cell {
-    void* element;
-    struct lf_cell* next;
-};
-
-struct linked_fifo {
-    struct lf_cell* first;
-    struct lf_cell* last;
-};
 
 
 
