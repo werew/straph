@@ -41,6 +41,7 @@ struct out_buf {
     void* buf;               // Output buffer
 };
 
+
 /**
  * Linear buffer:
  * A linear buffer provides a finite write and
@@ -51,7 +52,9 @@ struct l_buf {
     char* buf;             // Pointer to the buf 
     unsigned int sizebuf;  // Size of the buf
     unsigned int of_empty; // Offset to the unwritten zone
-    rw_spinlock lock;      // Readers-writer lock to regulate of_empty access
+
+    pthread_mutex_t mutex; // To regulate of_empty access
+    pthread_cond_t  cond;  // To signal new available data
 };
 
 
