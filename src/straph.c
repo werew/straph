@@ -52,6 +52,94 @@ ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
     return nbyte; 
 }
 
+int deactivate_lb(struct l_buf* lb){
+    // Update offset
+    int err;
+    if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
+        errno = err;
+        return -1;
+    }
+
+    lb->status = BUF_INACTIVE; // Update
+
+    if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
+        errno = err;
+        return -1;
+    }
+
+    // Awake every waiting reader 
+    if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
+        errno = err;
+        return -1;
+    }
+    
+    return 0; 
+}
+
+
+int activate_lb(struct l_buf* lb){
+    // Update offset
+    int err;
+    if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
+        errno = err;
+        return -1;
+    }
+
+    lb->status = BUF_ACTIVE; // Update
+
+    if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
+        errno = err;
+        return -1;
+    }
+
+    // Awake every waiting reader 
+    if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
+        errno = err;
+        return -1;
+    }
+    
+    return 0; 
+}
+
+int deactivate_buffer(node n, unsigned int slot){
+
+    if (n->nb_outbufs <= slot               ||
+        n->output_buffers[slot].buf == NULL ){
+        errno = ENOENT;
+        return -1;
+    }
+
+    switch (n->output_buffers[slot].type){
+        case LIN_BUF: 
+            return deactivate_lb(n->output_buffers[slot].buf);
+        case CIR_BUF: 
+            return 0; //deactivate_cb(n->output_buffers[slot].buf);
+        default: 
+            errno = EINVAL;
+            return -1;
+    }
+
+}
+
+int activate_buffer(node n, unsigned int slot){
+
+    if (n->nb_outbufs <= slot               ||
+        n->output_buffers[slot].buf == NULL ){
+        errno = ENOENT;
+        return -1;
+    }
+
+    switch (n->output_buffers[slot].type){
+        case LIN_BUF: 
+            return activate_lb(n->output_buffers[slot].buf);
+        case CIR_BUF: 
+            return 0; //activate_cb(n->output_buffers[slot].buf);
+        default: 
+            errno = EINVAL;
+            return -1;
+    }
+
+}
 
 
 
@@ -76,14 +164,21 @@ ssize_t read_lb(struct inslot_l* in, void* buf, size_t nbyte){
     }
     
     // Wait condition
-    while (lb->of_empty - in->of_start < nbyte){
+    while (lb->of_empty - in->of_start < nbyte &&
+           lb->status != BUF_INACTIVE          ){
+
 
         err = pthread_cond_wait(&lb->cond, &lb->mutex);
         if (err != 0){
             pthread_mutex_unlock(&lb->mutex);
             errno = err;
+            perror("Error:");
             return -1;
         }
+    }
+
+    if (lb->status == BUF_INACTIVE){
+       nbyte = lb->of_empty - in->of_start;
     }
 
     // Unlock access
@@ -210,6 +305,7 @@ struct l_buf* new_lbuf(size_t sizebuf){
 
     b->sizebuf = sizebuf;
     b->of_empty = 0;
+    b->status = BUF_READY;
 
     int err;
     if ((err = pthread_mutex_init(&b->mutex, NULL)) != 0 ||
@@ -477,13 +573,19 @@ int launcher(struct linked_fifo* lf){
 void* routine_wrapper(void* n){
 
     node nd = (node) n;
+
+    /* Activate out buffers */
+    unsigned int i;
+    for (i = 0; i < nd->nb_outbufs; i++){
+        activate_buffer(nd,i);
+    }
+
     void* ret = nd->entry(n);
 
     /* Update status */
     nd->status = TERMINATED;
 
     /* Free input slots */
-    unsigned int i;
     for (i = 0; i < nd->nb_inslots; i++){
         struct inslot_c* is = nd->input_slots[i];
         if (is == NULL) continue;
@@ -501,7 +603,7 @@ void* routine_wrapper(void* n){
     struct linked_fifo lf;
     lf_init(&lf);
 
-    /* Init with current node's neighbours */
+    /* Init list with current node's neighbours */
     for (i = 0; i < nd->nb_neigh; i++){
         if (lf_push(&lf, nd->neigh[i].n) == -1){
             lf_drop(&lf);
@@ -510,6 +612,11 @@ void* routine_wrapper(void* n){
     } 
 
     if (launcher(&lf) == -1) lf_drop(&lf);
+
+    /* Deactivate out buffers */
+    for (i = 0; i < nd->nb_outbufs; i++){
+        deactivate_buffer(nd,i);
+    }
 
     return ret;
 }
@@ -583,8 +690,6 @@ int launch_node(node n){
 }
 
 
-
-
 int join_straph(straph s){
      
     struct linked_fifo lf;
@@ -622,7 +727,9 @@ int join_straph(straph s){
             if (lf_push(&lf, n->neigh[i].n) == -1) goto error;
         } 
     }
-    
+
+    //TODO st_rewind (set BUF_READY, and other stuffs)
+
     return 0;
 
 error:
@@ -795,26 +902,30 @@ void _fail(const char* msg, int line, const char* func){
 }
 #define fail(x) _fail(x, __LINE__, __func__)
 
-
+int asd;
 void* test(node n){
     char buf[10];
-    size_t l = st_read(n,0,buf,7);
-    printf("length: %ld \"%s\"\n",l,buf); 
+    size_t l = st_read(n,0,buf,10);
+    printf("%d--> length: %ld \"%s\"\n",asd++,l,buf); 
     st_write(n,0,"hello",6);
     return NULL;
 }
 
+
+
+#define NN 10
 int main(void){
     straph s = new_straph();
-    node ns[10];
-
+    node ns[NN];
+   
+ 
     int i;
-    for (i =0; i<10; i++){
+    for (i =0; i<NN; i++){
         ns[i] = new_node(test);
         if (ns[i] == NULL) fail("new_node");
     } 
 
-    for (i=0; i<9; i++){
+    for (i=0; i< NN-1; i++){
         //XXX this should not be necessary
         if (set_buffer(ns[i], 0, LIN_BUF, 10) != 0) fail("set_buffer");
         if (link_nodes(ns[i],0,ns[i+1],0, SEQ_MODE) != 0) fail("link_nodes");
