@@ -222,38 +222,50 @@ typedef struct s_straph {
 
 
 
-
-
-
-
-straph new_straph(void);
-node new_node(void* (*entry)(node));
-int add_start_node(straph g, node n);
-struct l_buf* new_lbuf(size_t sizebuf);
-struct c_buf* new_cbuf(size_t sizebuf);
+/* Linked fifos */
 void lf_init(struct linked_fifo* lf);
 int lf_push(struct linked_fifo* lf, void* el);
 void* lf_pop(struct linked_fifo* lf);
 void lf_drop(struct linked_fifo* lf);
-void* routine_wrapper(void* n);
-int launch_node(node n);
-int launch_straph(straph s);
-struct inslot_l* new_inslot_l(struct out_buf* b);
-struct inslot_l* new_inslot_c(struct out_buf* b);
-int join_straph(straph s);
-int node_destroy(node n);
-int cbuf_destroy(struct c_buf* b);
-int lbuf_destroy(struct l_buf* b);
-int set_buffer(node n, unsigned int idx_buf, 
-               unsigned char buftype, size_t bufsize);
-int link_nodes(node a, unsigned int idx_buf, 
-               node b, unsigned int islot, unsigned char mode);
 
+
+/* Read/Write locks */
 int rw_spinlock_rlock(rw_spinlock l);
 int rw_spinlock_runlock(rw_spinlock l);
 int rw_spinlock_wlock(rw_spinlock l);
 int rw_spinlock_wunlock(rw_spinlock l);
 int rw_spinlock_init(rw_spinlock* l);
 int rw_spinlock_destroy(rw_spinlock l);
+
+
+/* Straph user's interface */
+straph new_straph(void);
+node new_node(void* (*entry)(node));
+int add_start_node(straph g, node n);
+int launch_straph(straph s);
+int join_straph(straph s);
+int node_destroy(node n);
+int straph_destroy(straph s);
+int set_buffer(node n, unsigned int idx_buf, unsigned char buftype, size_t bufsize);
+int link_nodes(node a, unsigned int idx_buf, node b, unsigned int islot, unsigned char mode);
+int setbufstat(node n, unsigned int slot, int status);
+
+
+/* Straph's internals */
+struct l_buf* new_lbuf(size_t sizebuf);
+struct c_buf* new_cbuf(size_t sizebuf);
+int cbuf_destroy(struct c_buf* b);
+int lbuf_destroy(struct l_buf* b);
+struct inslot_l* new_inslot_l(struct out_buf* b);
+struct inslot_l* new_inslot_c(struct out_buf* b);
+int launch_node(node n);
+void* routine_wrapper(void* n);
+ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte);
+int setbufstat_lb(struct l_buf* lb, int status);
+ssize_t read_lb(struct inslot_l* in, void* buf, size_t nbyte);
+ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
+ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
+
+
 
 #endif

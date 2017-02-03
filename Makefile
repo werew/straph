@@ -1,13 +1,46 @@
+# Project name
+TARGET = straph
 
+# Folders 
+OBJDIR = obj
+BINDIR = bin
+SRCDIR = src
 INCDIR = include
-CFLAGS = -Wall \
-         -pthread \
+
+# Compiler
+CC = gcc
+CFLAGS = -pthread     \
+         -Wall        \
+         -I $(INCDIR) \
          -g
 
-straph: src/straph.c src/locks.c
-	$(CC) $(CFLAGS) -I $(INCDIR) $^ -o $@
+# Files
+SOURCES := $(wildcard $(SRCDIR)/*.c)
+INCLUDES := $(INCDIR)/*.h
+OBJECTS := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) 
+DEP = $(OBJECTS:%.o=%.d)
+EXECUTABLE := $(BINDIR)/$(TARGET)
 
-src/straph.c: include/straph.h
+
+
+$(TARGET): $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS)
+	@echo "\n-----------------> Linking ... "
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
+
+# Dependencies to the headers are
+# covered by this include
+-include $(DEP) 		
+
+
+$(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
+	@mkdir -p $(OBJDIR)
+	@echo "\n-----------------> Compiling $@ ... "
+	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 clean:
-	rm -f straph
+	@echo "----------------- Cleaning -----------------"
+	rm -f $(OBJECTS) $(EXECUTABLE) 
