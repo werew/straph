@@ -38,3 +38,7 @@
 
 # Target executable
 straph
+
+# Folders
+bin/
+obj/
