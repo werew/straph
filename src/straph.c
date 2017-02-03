@@ -52,7 +52,7 @@ ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
     return nbyte; 
 }
 
-int deactivate_lb(struct l_buf* lb){
+int setbufstat_lb(struct l_buf* lb, int status){
     // Update offset
     int err;
     if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
@@ -60,7 +60,7 @@ int deactivate_lb(struct l_buf* lb){
         return -1;
     }
 
-    lb->status = BUF_INACTIVE; // Update
+    lb->status = status; // Update
 
     if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
         errno = err;
@@ -76,32 +76,7 @@ int deactivate_lb(struct l_buf* lb){
     return 0; 
 }
 
-
-int activate_lb(struct l_buf* lb){
-    // Update offset
-    int err;
-    if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
-
-    lb->status = BUF_ACTIVE; // Update
-
-    if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
-
-    // Awake every waiting reader 
-    if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
-        errno = err;
-        return -1;
-    }
-    
-    return 0; 
-}
-
-int deactivate_buffer(node n, unsigned int slot){
+int setbufstat(node n, unsigned int slot, int status){
 
     if (n->nb_outbufs <= slot               ||
         n->output_buffers[slot].buf == NULL ){
@@ -111,35 +86,15 @@ int deactivate_buffer(node n, unsigned int slot){
 
     switch (n->output_buffers[slot].type){
         case LIN_BUF: 
-            return deactivate_lb(n->output_buffers[slot].buf);
+            return setbufstat_lb(n->output_buffers[slot].buf, status);
         case CIR_BUF: 
-            return 0; //deactivate_cb(n->output_buffers[slot].buf);
+            return 0; 
         default: 
             errno = EINVAL;
             return -1;
     }
-
 }
 
-int activate_buffer(node n, unsigned int slot){
-
-    if (n->nb_outbufs <= slot               ||
-        n->output_buffers[slot].buf == NULL ){
-        errno = ENOENT;
-        return -1;
-    }
-
-    switch (n->output_buffers[slot].type){
-        case LIN_BUF: 
-            return activate_lb(n->output_buffers[slot].buf);
-        case CIR_BUF: 
-            return 0; //activate_cb(n->output_buffers[slot].buf);
-        default: 
-            errno = EINVAL;
-            return -1;
-    }
-
-}
 
 
 
@@ -577,7 +532,7 @@ void* routine_wrapper(void* n){
     /* Activate out buffers */
     unsigned int i;
     for (i = 0; i < nd->nb_outbufs; i++){
-        activate_buffer(nd,i);
+        setbufstat(nd, i, BUF_ACTIVE);
     }
 
     void* ret = nd->entry(n);
@@ -615,7 +570,7 @@ void* routine_wrapper(void* n){
 
     /* Deactivate out buffers */
     for (i = 0; i < nd->nb_outbufs; i++){
-        deactivate_buffer(nd,i);
+        setbufstat(nd,i, BUF_INACTIVE);
     }
 
     return ret;
@@ -928,7 +883,7 @@ int main(void){
     for (i=0; i< NN-1; i++){
         //XXX this should not be necessary
         if (set_buffer(ns[i], 0, LIN_BUF, 10) != 0) fail("set_buffer");
-        if (link_nodes(ns[i],0,ns[i+1],0, SEQ_MODE) != 0) fail("link_nodes");
+        if (link_nodes(ns[i],0,ns[i+1],0, PAR_MODE) != 0) fail("link_nodes");
     }
     
     if (add_start_node(s, ns[0]) != 0) fail("add_start_node");
