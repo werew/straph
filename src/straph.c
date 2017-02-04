@@ -4,57 +4,85 @@
 #include <errno.h>
 #include "straph.h"
 
-// TODO set better naming conventions
-// TODO improve code readablility 
+/* TODO set better naming conventions */
+/* TODO improve code readablility  */
 
+
+
+/**
+ * @brief Creates a new empty straph
+ * 
+ * Creates a new straph which doesn't contain (yet) any node. After
+ * used a straph must be freed using the function st_destroy
+ *
+ * @return a straph or NULL in case of error in this case errno is
+ *         set appropriately
+ *
+ * @see st_destroy
+ */
 straph st_create(void){
-    straph s = calloc(1, sizeof (struct s_straph));
-    if (s == NULL) return NULL;
+    straph st = calloc(1, sizeof (struct s_straph));
+    if (st == NULL) return NULL;
 
-    return s;
+    return st;
 }
 
 
 /**
- * Creates a new node. At the beginning each
- * node is inactive.
+ * @brief Creates a new node
+ *
+ * Creates a new inactive node. This node can be directly used
+ * in a straph by linking it to another node of the straph or
+ * attaching it to the straph directly
+ *
  * @param entry Entry point for the execution of the node
- * @param bufsize Size of the output buffer for this node.
- *        If bufsize is 0 then the output of this node will
- *        be ignored
- * @return A new inactive node, or NULL in case of error
- * @note When a node is linked to another using the SEQ_MODE
- *       running mode, then sizebuf represent the max size
- *       of the output of the first node
+ * @return an inactive node or NULL in case of error, in this case
+ *         errno is set appropriately
  */ 
 node st_makenode(void* (*entry)(node)){
-    node n = calloc(1, sizeof (struct s_node));
-    if (n == NULL) return NULL;
-    
-    // Init lock
     int err;
-    if ((err = pthread_spin_init(&n->launch_lock,
+    node nd;
+
+    nd = calloc(1, sizeof (struct s_node));
+    if (nd == NULL) return NULL;
+    
+    /* Initialize node */
+    if ((err = pthread_spin_init(&nd->launch_lock,
                     PTHREAD_PROCESS_PRIVATE)) != 0){
-        free(n);
+        free(nd);
         errno = err;
         return NULL;
     }
+    nd->entry = entry;
+    nd->status = INACTIVE;
 
-    // Set entry point
-    n->entry = entry;
-
-    return n;
+    return nd;
 }
 
 
+/**
+ * @brief Add a node to the a straph
+ *
+ * Add a node to a straph. This node will be used as one of 
+ * entry points of the straph when st_start is called
+ *
+ * @param s a straph
+ * @param n a node
+ * @return 0 in case of success or -1 in case of error
+ *
+ * @see st_start
+ */
+int st_addnode(straph st, node nd){
 
-int st_addnode(straph g, node n){
-    void* tmp = realloc(g->entries, 
-                (g->nb_entries+1)*sizeof(node));
-    if (tmp == NULL) return -1;
+    /* Extend by one the list of entries */
+    void* entries = realloc(st->entries, 
+        (st->nb_entries+1)*sizeof(node));
+    if (entries == NULL) return -1;
 
-    g->entries= tmp;
-    g->entries[g->nb_entries++] = n;
+    st->entries= entries;
+
+    /* Add n to the list */
+    st->entries[st->nb_entries++] = nd;
 
     return 0;
 }
@@ -67,43 +95,46 @@ int st_addnode(straph g, node n){
 
 
 /* Results are indefined if st_setbuffer on node != INACTIVE */
-int st_setbuffer(node n, unsigned int idx_buf, 
+/**
+ * @brief Set an output buffer for the given node
+ *
+ *
+ */
+int st_setbuffer(node nd, unsigned int bufindex, 
     unsigned char buftype, size_t bufsize){
 
-    /* Increase array size if necessary */
-    if (n->nb_outbufs <= idx_buf){
-        // Realloc if idx_buf is beyond the capacity
-        struct out_buf* tmp = realloc(n->output_buffers, 
-                    (idx_buf+1)*sizeof(struct out_buf));
+    void *newbuf;
+    unsigned int nb_newstructs;
+    struct out_buf* tmp;
+    unsigned int nb_bufs;
+
+    /* Extend the array if bufindex is beyond the capacity */
+    if (nd->nb_outbufs <= bufindex){
+
+        nb_bufs = bufindex + 1;
+        tmp = realloc(nd->output_buffers, 
+            nb_bufs * sizeof(struct out_buf));
         if (tmp == NULL) return -1;
 
-        // Set to NULL all new slots
-        memset(tmp + n->nb_outbufs, 0,(idx_buf+1-n->nb_outbufs)*
-                sizeof(struct out_buf));
+        /* Set to NULL all the new unused structs */
+        nb_newstructs = nb_bufs - nd->nb_outbufs;
+        memset(tmp+nd->nb_outbufs, 0, 
+            nb_newstructs * sizeof(struct out_buf));
 
-        n->output_buffers = tmp;
-        n->nb_outbufs = idx_buf+1;
+        nd->output_buffers = tmp;
+        nd->nb_outbufs = bufindex+1;
     }
 
     /* Create new buffer */
-    void* newbuf;
-    switch (buftype){
-        case CIR_BUF: newbuf = st_makecb(bufsize);
-            break;
-        case LIN_BUF: newbuf = st_makelb(bufsize);
-            break;
-        default: errno = EINVAL;
-                 return -1;
-    }
+    newbuf = st_makeb(buftype, bufsize);
     if (newbuf == NULL) return -1;
 
-
-    /* Free old buffer */
-    if (n->output_buffers[idx_buf].buf != NULL){
-        switch (n->output_buffers[idx_buf].type){
-            case LIN_BUF: st_destroylb(n->output_buffers[idx_buf].buf);
+    /* Destroy old buffer if necessary */
+    if (nd->output_buffers[bufindex].buf != NULL){
+        switch (nd->output_buffers[bufindex].type){
+            case LIN_BUF: st_destroylb(nd->output_buffers[bufindex].buf);
                 break;
-            case CIR_BUF: st_destroycb(n->output_buffers[idx_buf].buf);
+            case CIR_BUF: st_destroycb(nd->output_buffers[bufindex].buf);
                 break;
             default: free(newbuf);
                      errno = EINVAL;
@@ -112,27 +143,28 @@ int st_setbuffer(node n, unsigned int idx_buf,
     }
 
     /* Update buff */
-    n->output_buffers[idx_buf].type = buftype;
-    n->output_buffers[idx_buf].buf  = newbuf;
+    nd->output_buffers[bufindex].type = buftype;
+    nd->output_buffers[bufindex].buf  = newbuf;
 
     return 0;
 }
 
 
 
-// TODO function to link nodes without IO
+/* TODO function to link nodes without IO */
 
 int st_nlink(node a, unsigned int idx_buf, 
     node b, unsigned int islot, unsigned char mode){
+    void *tmp;
 
-    // Check index buffer
+    /* Check index buffer */
     if (idx_buf >= a->nb_outbufs){
         errno = EINVAL;
         return -1;
     }
 
-    // Add neighbour to 'a' and set the mode
-    void* tmp = realloc(a->neigh, (a->nb_neigh+1)*
+    /* Add neighbour to 'a' and set the mode */
+    tmp = realloc(a->neigh, (a->nb_neigh+1)*
                  sizeof(struct neighbour));
     if (tmp == NULL) return -1;
     a->neigh = tmp;
@@ -140,13 +172,13 @@ int st_nlink(node a, unsigned int idx_buf,
     a->neigh[a->nb_neigh++].run_mode = mode;
 
 
-    // Add a new input slot to 'b'
+    /* Add a new input slot to 'b' */
     if (b->nb_inslots <= islot){
-        // Realloc if islot is beyond the capacity
+        /* Realloc if islot is beyond the capacity */
         tmp = realloc(b->input_slots, (islot+1)*sizeof(void*));
         if (tmp == NULL){a->nb_neigh--; return -1;}
 
-        // Set to NULL all new slots
+        /* Set to NULL all new slots */
         memset((void**) tmp + b->nb_inslots, 0,
                 (islot+1 - b->nb_inslots)*sizeof(void*));
 
@@ -176,8 +208,10 @@ int st_starter(struct linked_fifo* lf){
 
         /* Collect node's neighbours */
         for (i = 0; i < n->nb_neigh; i++){
-            // If the running mode is parallel,
-            // add the node to the list
+            /* 
+             If the running mode is parallel,
+             add the node to the list 
+            */
             if (n->neigh[i].run_mode != PAR_MODE) continue;
            
             if (lf_push(lf, n->neigh[i].n) == -1){
@@ -191,38 +225,42 @@ int st_starter(struct linked_fifo* lf){
 
 
 
-// XXX what about ret in case of error ??
-void* st_threadwrapper(void* n){
+/* XXX what about ret in case of error ?? */
+void* st_threadwrapper(void *n){
+    struct linked_fifo lf;
+    struct inslot_c* is;
+    struct out_buf* src;
+    unsigned int i;
+    void *ret;
+    node nd;
 
-    node nd = (node) n;
+    nd = (node) n;
 
     /* Activate out buffers */
-    unsigned int i;
     for (i = 0; i < nd->nb_outbufs; i++){
         st_bufstat(nd, i, BUF_ACTIVE);
     }
 
-    void* ret = nd->entry(n);
+    ret = nd->entry(n);
 
     /* Update status */
     nd->status = TERMINATED;
 
     /* Free input slots */
     for (i = 0; i < nd->nb_inslots; i++){
-        struct inslot_c* is = nd->input_slots[i];
+        is = nd->input_slots[i];
         if (is == NULL) continue;
 
-        struct out_buf* src = is->src;         
+        src = is->src;         
         if (src->type == CIR_BUF) {
             free(is->cache2);
         }
         free(is);
 
-        nd->input_slots[i] = src;   // Restore src
+        nd->input_slots[i] = src;   /* Restore src */
     }
 
     /* Launch inactives neighbours */
-    struct linked_fifo lf;
     lf_init(&lf);
 
     /* Init list with current node's neighbours */
@@ -248,8 +286,10 @@ void* st_threadwrapper(void* n){
 /* returns previous status */
 int st_nstart(node n){
 
-    /* Lock the node */
     int err;
+    unsigned int i;
+
+    /* Lock the node */
     if ((err = pthread_spin_lock(&n->launch_lock)) != 0) {
         errno = err;
         return -1;
@@ -264,7 +304,6 @@ int st_nstart(node n){
 
     puts("Launch");
     /* Create input slots */
-    unsigned int i;
     for (i = 0; i < n->nb_inslots; i++){
         void* islot;
 
@@ -312,45 +351,48 @@ int st_nstart(node n){
 }
 
 
-int st_join(straph s){
-     
+int st_join(straph st){
+    node nd;
+    int err;
+    unsigned int i;
     struct linked_fifo lf;
+
+
     lf_init(&lf);
 
     /* Init fifo with straph's entries */
-    unsigned int i;
-    for (i = 0; i < s->nb_entries; i++){
-        if (lf_push(&lf, s->entries[i]) == -1) goto error;
+    for (i = 0; i < st->nb_entries; i++){
+        if (lf_push(&lf, st->entries[i]) == -1) goto error;
     }
 
     /* Join nodes */
-    node n = NULL; 
+    nd = NULL; 
     while (1){
 
         /* Pop and join node */
-        n = lf_pop(&lf);
-        if (n == NULL){
+        nd = lf_pop(&lf);
+        if (nd == NULL){
             if (errno == ENOENT) break;
             goto error;
         }
 
-        int err = pthread_join(n->id, &n->ret);
+        err = pthread_join(nd->id, &nd->ret);
         if (err != 0){
             errno = err;
             goto error;
         }
 
         /* Once joined return inactive */
-        n->status = INACTIVE;
+        nd->status = INACTIVE;
 
         /* Collect neighbours */
-        for (i = 0; i < n->nb_neigh; i++){
-            if (n->neigh[i].n->status == INACTIVE) continue;
-            if (lf_push(&lf, n->neigh[i].n) == -1) goto error;
+        for (i = 0; i < nd->nb_neigh; i++){
+            if (nd->neigh[i].n->status == INACTIVE) continue;
+            if (lf_push(&lf, nd->neigh[i].n) == -1) goto error;
         } 
     }
 
-    //TODO st_rewind (set BUF_READY, and other stuffs)
+    /*TODO st_rewind (set BUF_READY, and other stuffs) */
 
     return 0;
 
@@ -362,6 +404,7 @@ error:
 
 
 int st_ndestroy(node n){
+    int err;
     unsigned int i;
 
     /* Destroy out bufs */
@@ -386,7 +429,7 @@ int st_ndestroy(node n){
     free(n->input_slots);
     free(n->neigh);
 
-    int err = pthread_spin_destroy(&n->launch_lock);
+    err = pthread_spin_destroy(&n->launch_lock);
     if (err != 0){
         errno = err;
         return -1;
@@ -398,7 +441,7 @@ int st_ndestroy(node n){
 }
 
 
-// TODO
+/* TODO */
 int st_destroy(straph s){
     unsigned int i;
     node n = NULL; 
@@ -407,8 +450,10 @@ int st_destroy(straph s){
     lf_init(&lf2);
 
 
-    /* Collect nodes to avoid double frees (collected 
-       nodes are marked with status = DOOMED) */
+    /* 
+     Collect nodes to avoid double frees (collected 
+     nodes are marked with status = DOOMED) 
+    */
 
     
     for (i = 0; i < s->nb_entries; i++){
@@ -456,11 +501,11 @@ error:
 
 int st_start(straph s){
 
+    unsigned int i;
     struct linked_fifo lf;
     lf_init(&lf);
 
     /* Init fifo with straph's entries */
-    unsigned int i;
     for (i = 0; i < s->nb_entries; i++){
         if (lf_push(&lf, s->entries[i]) == -1){
             lf_drop(&lf);

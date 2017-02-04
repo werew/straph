@@ -8,13 +8,13 @@
 int rw_spinlock_rlock(rw_spinlock l){
     int err;
 
-    // Lock r
+    /* Lock r */
     if ((err = pthread_spin_lock(&l.r)) != 0){
         errno = err;
         return -1;
     }
 
-    // Lock w if this is the first reader
+    /* Lock w if this is the first reader */
     if (++l.n_r == 1){
         if ((err = pthread_spin_lock(&l.w)) != 0){
             pthread_spin_unlock(&l.r);
@@ -23,7 +23,7 @@ int rw_spinlock_rlock(rw_spinlock l){
         }
     }
 
-    // Unlock r
+    /* Unlock r */
     if ((err = pthread_spin_unlock(&l.r)) != 0){
         errno = err;
         return -1;
@@ -35,13 +35,13 @@ int rw_spinlock_rlock(rw_spinlock l){
 int rw_spinlock_runlock(rw_spinlock l){
     int err;
 
-    // Lock r
+    /* Lock r */
     if ((err = pthread_spin_lock(&l.r)) != 0){
         errno = err;
         return -1;
     }
 
-    // Unlock w if this is the last reader
+    /* Unlock w if this is the last reader */
     if (--l.n_r == 0){
         if ((err = pthread_spin_unlock(&l.w)) != 0){
             pthread_spin_unlock(&l.r);
@@ -50,7 +50,7 @@ int rw_spinlock_runlock(rw_spinlock l){
         }
     }
 
-    // Unlock r
+    /* Unlock r */
     if ((err = pthread_spin_unlock(&l.r)) != 0){
         errno = err;
         return -1;
@@ -61,7 +61,7 @@ int rw_spinlock_runlock(rw_spinlock l){
     
 
 int rw_spinlock_wlock(rw_spinlock l){
-    // Lock w
+    /* Lock w */
     int err;
     if ((err = pthread_spin_lock(&l.w)) != 0){
         errno = err;
@@ -71,7 +71,7 @@ int rw_spinlock_wlock(rw_spinlock l){
 }
 
 int rw_spinlock_wunlock(rw_spinlock l){
-    // Unlock w
+    /* Unlock w */
     int err;
     if ((err = pthread_spin_unlock(&l.w)) != 0){
         errno = err;
@@ -149,6 +149,7 @@ int lf_push(struct linked_fifo* lf, void* el){
  * @return The last element of the list, of NULL in case of error
  */
 void* lf_pop(struct linked_fifo* lf){
+    void *el;
     struct lf_cell* f = lf->first;
     if (f == NULL){
         errno = ENOENT;
@@ -158,7 +159,7 @@ void* lf_pop(struct linked_fifo* lf){
     lf->first = f->next;
     if (lf->last == f) lf->last = f->next;
 
-    void* el = f->element;
+    el = f->element;
     free(f);
 
     return el;

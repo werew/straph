@@ -2,17 +2,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stddef.h>
+#include <pthread.h>
 #include "straph.h"
 
 
 ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte){
 
-    // Calculate max write capability 
-    // Note that the writer has full read-access to 
-    // of_size because it's the only potential writer
-    size_t space_available = lb->sizebuf-lb->of_empty;
-    size_t write_size = (space_available < nbyte)? 
-                         space_available : nbyte;
+    int err;
+    size_t space_available;
+    size_t write_size;
+
+    /* 
+     Calculate max write capability 
+     Note that the writer has full read-access to 
+     of_size because it's the only potential writer 
+    */
+    space_available = lb->sizebuf-lb->of_empty;
+    write_size = (space_available < nbyte)? 
+                  space_available : nbyte;
 
     if (write_size == 0) return nbyte;
 
@@ -20,21 +28,20 @@ ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte){
 
     memcpy(&lb->buf[lb->of_empty], buf, write_size);
     
-    // Update offset
-    int err;
+    /* Update offset */
     if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
         errno = err;
         return -1;
     }
 
-    lb->of_empty += write_size; // Update
+    lb->of_empty += write_size; /* Update */
 
     if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
         errno = err;
         return -1;
     }
 
-    // Signal new available data
+    /* Signal new available data */
     if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
         errno = err;
         return -1;
@@ -44,21 +51,21 @@ ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte){
 }
 
 int st_bufstatlb(struct l_buf* lb, int status){
-    // Update offset
+    /* Update offset */
     int err;
     if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
         errno = err;
         return -1;
     }
 
-    lb->status = status; // Update
+    lb->status = status; /* Update */
 
     if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
         errno = err;
         return -1;
     }
 
-    // Awake every waiting reader 
+    /* Awake every waiting reader  */
     if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
         errno = err;
         return -1;
@@ -90,26 +97,28 @@ int st_bufstat(node n, unsigned int slot, int status){
 
 
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
+    int err;
 
-    // Source buffer
+    /* Source buffer */
     struct l_buf* lb = in->src->buf;
     
-    // Read the minimum between the requested size and
-    // the max size of the remaining buffer
+    /* 
+     Read the minimum between the requested size and
+     the max size of the remaining buffer
+    */
     size_t max_read = lb->sizebuf - in->of_start;
     nbyte = (nbyte < max_read)? nbyte : max_read;
 
-    // Ignore reads of zero bytes
+    /* Ignore reads of zero bytes */
     if (nbyte == 0) return 0;
 
-    // Lock access     
-    int err;
+    /* Lock access */
     if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
         errno = err;
         return -1;
     }
     
-    // Wait condition
+    /* Wait condition */
     while (lb->of_empty - in->of_start < nbyte &&
            lb->status != BUF_INACTIVE          ){
 
@@ -127,13 +136,13 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
        nbyte = lb->of_empty - in->of_start;
     }
 
-    // Unlock access
+    /* Unlock access */
     if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
         errno = err;
         return -1;
     }
 
-    // Perform read
+    /* Perform read */
     memcpy(buf, &lb->buf[in->of_start], nbyte);
     in->of_start += nbyte;
 
@@ -143,15 +152,17 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 
 
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
+    struct inslot_l* islot;
+    struct out_buf* ob;
 
     if (n->nb_inslots <= slot        ||
         n->input_slots[slot] == NULL ){
         return 0;
     }
 
-    // Get out buffer
-    struct inslot_l* islot = n->input_slots[slot];
-    struct out_buf* ob = islot->src; 
+    /* Get out buffer */
+    islot = n->input_slots[slot];
+    ob = islot->src; 
 
     if (ob == NULL) return 0;
 
@@ -169,10 +180,12 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
 ssize_t st_write(node n, unsigned int slot, 
               const void* buf, size_t nbyte){
 
-    // XXX should a node detect NULL buffers ?
+    /* XXX should a node detect NULL buffers ? */
 
-    // If no slot is available (user choice) 
-    // act as the write was successful 
+    /* 
+     If no slot is available (user choice) 
+     act as the write was successful 
+    */
     if (n->nb_outbufs <= slot               ||
         n->output_buffers[slot].buf == NULL ){
         return nbyte;
@@ -183,8 +196,8 @@ ssize_t st_write(node n, unsigned int slot,
             return st_lbwrite(n->output_buffers[slot].buf,
                             buf, nbyte);
         case CIR_BUF: 
-            return 0; //write_cb(n->output_buffers[slot].buf,
-                       //     buf, nbyte);
+            return 0; /*write_cb(n->output_buffers[slot].buf,
+                       buf, nbyte); */
         default: 
             errno = EINVAL;
             return -1;
@@ -195,7 +208,10 @@ ssize_t st_write(node n, unsigned int slot,
 
 
 struct l_buf* st_makelb(size_t sizebuf){
-    struct l_buf* b = malloc(sizeof(struct l_buf));
+    int err;
+    struct l_buf* b;
+
+    b = malloc(sizeof(struct l_buf));
     if (b == NULL) return NULL;
 
     b->buf = malloc(sizebuf);
@@ -208,7 +224,6 @@ struct l_buf* st_makelb(size_t sizebuf){
     b->of_empty = 0;
     b->status = BUF_READY;
 
-    int err;
     if ((err = pthread_mutex_init(&b->mutex, NULL)) != 0 ||
         (err = pthread_cond_init(&b->cond, NULL))   != 0 ){
         free(b->buf);
@@ -222,10 +237,12 @@ struct l_buf* st_makelb(size_t sizebuf){
 
 
 struct c_buf* st_makecb(size_t sizebuf){
-    struct c_buf* b = malloc(sizeof(struct c_buf));
+    int err;
+    struct c_buf* b;
+
+    b = malloc(sizeof(struct c_buf));
     if (b == NULL) return NULL;
 
-    int err;
     if ((err = pthread_mutex_init(&b->access_lock,
                     NULL)) != 0){
         free(b);
@@ -291,8 +308,11 @@ int st_destroylb(struct l_buf* b){
 }
 
 int st_destroycb(struct c_buf* b){
+    int err;
+
     free(b->buf);
-    int err = pthread_mutex_destroy(&b->access_lock);
+
+    err = pthread_mutex_destroy(&b->access_lock);
     if (err != 0){
         errno = err;
         return -1;
@@ -305,4 +325,16 @@ int st_destroycb(struct c_buf* b){
     }
     
     return 0;
+}
+
+
+void* st_makeb(unsigned char buftype, size_t bufsize){
+
+    switch (buftype){
+        case CIR_BUF: return st_makecb(bufsize);
+        case LIN_BUF: return st_makelb(bufsize);
+        default: errno = EINVAL;
+                 return NULL;
+    }
+
 }

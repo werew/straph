@@ -1,6 +1,7 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
+#include <stddef.h>
 #include <pthread.h>
 
 
@@ -9,21 +10,21 @@
 
 /* Linked fifo's cell */
 struct lf_cell {
-    void* element;         // Content of the cell
-    struct lf_cell* next;  // Next linked cell
+    void* element;         /* Content of the cell */
+    struct lf_cell* next;  /* Next linked cell */
 };
 
 /* Linked fifo */
 struct linked_fifo {
-    struct lf_cell* first; // Least recent cell of the list
-    struct lf_cell* last;  // Most recent cell of the list
+    struct lf_cell* first; /* Least recent cell of the list */
+    struct lf_cell* last;  /* Most recent cell of the list  */
 };
 
 /* Spinlock-based readers-writer lock */
 typedef struct rw_slock {
-    unsigned int n_r;      // Readers count
-    pthread_spinlock_t r;  // Lock for readers count
-    pthread_spinlock_t w;  // Writer lock
+    unsigned int n_r;      /* Readers count */
+    pthread_spinlock_t r;  /* Lock for readers count */
+    pthread_spinlock_t w;  /* Writer lock */
 } rw_spinlock;
 
 
@@ -42,8 +43,8 @@ typedef struct rw_slock {
  * Out buffer container
  */
 struct out_buf {
-    unsigned char type;      // Type of the buffer 
-    void* buf;               // Output buffer
+    unsigned char type;      /* Type of the buffer */
+    void* buf;               /* Output buffer */
 };
 
 
@@ -54,13 +55,16 @@ struct out_buf {
  * out of the capacity of the buffer shall be ignored.
  */
 struct l_buf {
-    char* buf;             // Pointer to the buf 
-    unsigned int sizebuf;  // Size of the buf
-    unsigned int of_empty; // Offset to the unwritten zone
+    char* buf;             /* Pointer to the buf */
+    unsigned int sizebuf;  /* Size of the buf */
+    unsigned int of_empty; /* Offset to the unwritten zone */
     
-    char status;           // Indicates if the buf is receiving data or not
-    pthread_mutex_t mutex; // To regulate of_empty access
-    pthread_cond_t  cond;  // To signal new available data
+    char status;           /* Indicates if the buf is 
+                              receiving data o not       
+                           */
+
+    pthread_mutex_t mutex; /* To regulate of_empty access  */
+    pthread_cond_t  cond;  /* To signal new available data */
 };
 
 
@@ -79,14 +83,14 @@ struct l_buf {
  *               contained in the chunk
  */
 struct c_buf {
-    char* buf;                  // Pointer to the buf
-    unsigned int sizebuf;       // Size of the buf
-    unsigned int of_firstck;    // Offset to the first used chunk
-    unsigned int of_lastck;     // Offset to the last used chunk
+    char* buf;                  /* Pointer to the buf */
+    unsigned int sizebuf;       /* Size of the buf */
+    unsigned int of_firstck;    /* Offset to the first used chunk */
+    unsigned int of_lastck;     /* Offset to the last used chunk  */
 
-    pthread_mutex_t access_lock;      // Mutex for buffer access
-    pthread_mutex_t nb_readers_mutex; // Mutex for read access
-    unsigned int nb_readers;          // Number of readers actives
+    pthread_mutex_t access_lock;      /* Mutex for buffer access */
+    pthread_mutex_t nb_readers_mutex; /* Mutex for read access */
+    unsigned int nb_readers;          /* Number of readers actives */
 };
 
 
@@ -107,8 +111,8 @@ struct c_buf {
  * used to read from a struct l_buf
  */
 struct inslot_l {
-    struct out_buf* src;      // Source buffer
-    unsigned int of_start;    // Offset to the unread data
+    struct out_buf* src;      /* Source buffer */
+    unsigned int of_start;    /* Offset to the unread data */
 };
 
 /**
@@ -117,17 +121,20 @@ struct inslot_l {
  */
 #define SIZE_CACHE1 128
 struct inslot_c {
-    struct out_buf* src;      // Source buffer
+    struct out_buf* src;      /* Source buffer */
 
-    char cache1[SIZE_CACHE1]; // Circular buffer. Each read must consume
-                              // all the readable data storing it if necessary
-                              // in this cache
-    unsigned int of_start;    // Offset to the unread data (cache1)
-    unsigned int of_end;      // Offset to the end of the unread data (cache1)
+    char cache1[SIZE_CACHE1]; /* Circular buffer. Each read must 
+                                 consume all the readable data storing
+                                 it if necessary in this cache */
 
-    char* cache2;             // Dynamic size cache to use only when cache1 is full
-    unsigned int of_start2;   // Offset to the unread data
-    unsigned int size_cache2; // Size of the cache2
+    unsigned int of_start;    /* Offset to the unread data (cache1) */
+    unsigned int of_end;      /* Offset to the end of the unread 
+                                 data (cache1) */
+
+    char* cache2;             /* Dynamic size cache to use only when 
+                                 cache1 is full */
+    unsigned int of_start2;   /* Offset to the unread data */
+    unsigned int size_cache2; /* Size of the cache2 */
 
 };
 
@@ -138,8 +145,8 @@ struct inslot_c {
 /******************** Core structures *********************/
 
 /* Run modes */
-#define PAR_MODE 0  // Parallel
-#define SEQ_MODE 1  // Sequential
+#define PAR_MODE 0  /* Parallel */
+#define SEQ_MODE 1  /* Sequential */
 
 /**
  * This struct is used to link each
@@ -147,8 +154,8 @@ struct inslot_c {
  * next to be run
  */
 struct neighbour { 
-    struct s_node* n;       // Neighbour
-    unsigned char run_mode; // Run mode of the neighbour
+    struct s_node* n;       /* Neighbour */
+    unsigned char run_mode; /* Run mode of the neighbour */
 };
 
 /**
@@ -180,29 +187,30 @@ struct neighbour {
  */
 typedef struct s_node {
 
-    pthread_spinlock_t launch_lock;  // Lock used while launching the node
-                                     // to avoid multiple executions
+    pthread_spinlock_t launch_lock;  /* Lock used while launching 
+                                        the node to avoid multiple 
+                                        executions */
 
-    void* (*entry)(struct s_node*);  // Entry point of the module
-    unsigned char status;            // Status of this node
-    pthread_t id;                    // Id of the module
-    void* ret;                       // Return value
+    void* (*entry)(struct s_node*);  /* Entry point of the module */
+    unsigned char status;            /* Status of this node */
+    pthread_t id;                    /* Id of the module */
+    void* ret;                       /* Return value */
 
     /* Input flow */    
-    unsigned int nb_inslots;         // Number of input slots
-    void ** input_slots;             // Pointers to the output buffers
-                                     // of the source nodes when not active.
-                                     // Pointers to the input slots
-                                     // when active
+    unsigned int nb_inslots;         /* Number of input slots */
+    void ** input_slots;             /* Pointers to the output buffer
+                                        of the source nodes when not 
+                                        active. Pointers to the input
+                                        slots when active */
 
     /* Output flow */    
-    unsigned int nb_outbufs;         // Number of output buffers
-    struct out_buf* output_buffers;  // Output buffers
+    unsigned int nb_outbufs;         /* Number of output buffers */
+    struct out_buf* output_buffers;  /* Output buffers */
 
 
     /* Edges */
-    struct neighbour* neigh;         // Adjacency list
-    unsigned int nb_neigh;           // Number of neighbours
+    struct neighbour* neigh;         /* Adjacency list */
+    unsigned int nb_neigh;           /* Number of neighbours */
 
 
 } *node;
@@ -214,8 +222,8 @@ typedef struct s_node {
  * in parallel several nodes (entry points)
  */
 typedef struct s_straph { 
-    node* entries;           // Entry points
-    unsigned int nb_entries; // Number of neighbours
+    node* entries;           /* Entry points */
+    unsigned int nb_entries; /* Number of neighbours */
 } *straph;
 
 
@@ -265,7 +273,7 @@ int st_bufstatlb(struct l_buf* lb, int status);
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte);
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
 ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
-
+void* st_makeb(unsigned char buftype, size_t bufsize);
 
 
 #endif
