@@ -10,9 +10,13 @@ INCDIR = include
 # Compiler
 CC = gcc
 CFLAGS = -pthread     \
+         -pedantic    \
          -Wall        \
+         -Wextra      \
+         -Werror      \
          -I $(INCDIR) \
          -g
+        # -std=c99     \
 
 # Files
 SOURCES := $(wildcard $(SRCDIR)/*.c)
