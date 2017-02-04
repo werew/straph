@@ -73,13 +73,14 @@ node st_makenode(void* (*entry)(node)){
  * @see st_start
  */
 int st_addnode(straph st, node nd){
-
+    void *new_entries;
+    
     /* Extend by one the list of entries */
-    void* entries = realloc(st->entries, 
+    new_entries = realloc(st->entries, 
         (st->nb_entries+1)*sizeof(node));
-    if (entries == NULL) return -1;
 
-    st->entries= entries;
+    if (new_entries == NULL) return -1;
+    st->entries= new_entries;
 
     /* Add n to the list */
     st->entries[st->nb_entries++] = nd;
