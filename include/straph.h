@@ -157,10 +157,10 @@ struct neighbour {
  *   | INACTIVE |<---+
  *   +----+-----+    |
  *        |          |
- *   launch_straph   | 
+ *   st_start   | 
  *        |          |
  *   +----v-----+    |
- *   |  ACTIVE  |    | join_straph
+ *   |  ACTIVE  |    | st_join
  *   +----+-----+    |
  *        |          |
  *  thread returns   |
@@ -239,30 +239,30 @@ int rw_spinlock_destroy(rw_spinlock l);
 
 
 /* Straph user's interface */
-straph new_straph(void);
-node new_node(void* (*entry)(node));
-int add_start_node(straph g, node n);
-int launch_straph(straph s);
-int join_straph(straph s);
-int node_destroy(node n);
-int straph_destroy(straph s);
-int set_buffer(node n, unsigned int idx_buf, unsigned char buftype, size_t bufsize);
-int link_nodes(node a, unsigned int idx_buf, node b, unsigned int islot, unsigned char mode);
-int setbufstat(node n, unsigned int slot, int status);
+straph st_create(void);
+node st_makenode(void* (*entry)(node));
+int st_addnode(straph g, node n);
+int st_start(straph s);
+int st_join(straph s);
+int st_ndestroy(node n);
+int st_destroy(straph s);
+int st_setbuffer(node n, unsigned int idx_buf, unsigned char buftype, size_t bufsize);
+int st_nlink(node a, unsigned int idx_buf, node b, unsigned int islot, unsigned char mode);
+int st_bufstat(node n, unsigned int slot, int status);
 
 
 /* Straph's internals */
-struct l_buf* new_lbuf(size_t sizebuf);
-struct c_buf* new_cbuf(size_t sizebuf);
-int cbuf_destroy(struct c_buf* b);
-int lbuf_destroy(struct l_buf* b);
-struct inslot_l* new_inslot_l(struct out_buf* b);
-struct inslot_l* new_inslot_c(struct out_buf* b);
-int launch_node(node n);
-void* routine_wrapper(void* n);
-ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte);
-int setbufstat_lb(struct l_buf* lb, int status);
-ssize_t read_lb(struct inslot_l* in, void* buf, size_t nbyte);
+struct l_buf* st_makelb(size_t sizebuf);
+struct c_buf* st_makecb(size_t sizebuf);
+int st_destroycb(struct c_buf* b);
+int st_destroylb(struct l_buf* b);
+struct inslot_l* st_makeinslotl(struct out_buf* b);
+struct inslot_l* st_makeinslotc(struct out_buf* b);
+int st_nstart(node n);
+void* st_threadwrapper(void* n);
+ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte);
+int st_bufstatlb(struct l_buf* lb, int status);
+ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte);
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
 ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
 

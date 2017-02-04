@@ -33,26 +33,26 @@ void* test(node n){
 
 #define NN 10
 int main(void){
-    straph s = new_straph();
+    straph s = st_create();
     node ns[NN];
    
  
     int i;
     for (i =0; i<NN; i++){
-        ns[i] = new_node(test);
-        if (ns[i] == NULL) fail("new_node");
+        ns[i] = st_makenode(test);
+        if (ns[i] == NULL) fail("makenode");
     } 
 
     for (i=0; i< NN-1; i++){
         //XXX this should not be necessary
-        if (set_buffer(ns[i], 0, LIN_BUF, 10) != 0) fail("set_buffer");
-        if (link_nodes(ns[i],0,ns[i+1],0, PAR_MODE) != 0) fail("link_nodes");
+        if (st_setbuffer(ns[i], 0, LIN_BUF, 10) != 0) fail("st_setbuffer");
+        if (st_nlink(ns[i],0,ns[i+1],0, PAR_MODE) != 0) fail("link_nodes");
     }
     
-    if (add_start_node(s, ns[0]) != 0) fail("add_start_node");
-    if (launch_straph(s) != 0) fail("launch_straph");
-    if (join_straph(s) != 0) fail("join_straph");
-    if (straph_destroy(s) != 0) fail("straph_destroy");
+    if (st_addnode(s, ns[0]) != 0) fail("addnode");
+    if (st_start(s) != 0) fail("st_start");
+    if (st_join(s) != 0) fail("st_join");
+    if (st_destroy(s) != 0) fail("straph_destroy");
 
     
     return 0;

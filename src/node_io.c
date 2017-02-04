@@ -5,7 +5,7 @@
 #include "straph.h"
 
 
-ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
+ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte){
 
     // Calculate max write capability 
     // Note that the writer has full read-access to 
@@ -43,7 +43,7 @@ ssize_t write_lb(struct l_buf* lb, const void* buf, size_t nbyte){
     return nbyte; 
 }
 
-int setbufstat_lb(struct l_buf* lb, int status){
+int st_bufstatlb(struct l_buf* lb, int status){
     // Update offset
     int err;
     if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
@@ -67,7 +67,7 @@ int setbufstat_lb(struct l_buf* lb, int status){
     return 0; 
 }
 
-int setbufstat(node n, unsigned int slot, int status){
+int st_bufstat(node n, unsigned int slot, int status){
 
     if (n->nb_outbufs <= slot               ||
         n->output_buffers[slot].buf == NULL ){
@@ -77,7 +77,7 @@ int setbufstat(node n, unsigned int slot, int status){
 
     switch (n->output_buffers[slot].type){
         case LIN_BUF: 
-            return setbufstat_lb(n->output_buffers[slot].buf, status);
+            return st_bufstatlb(n->output_buffers[slot].buf, status);
         case CIR_BUF: 
             return 0; 
         default: 
@@ -89,7 +89,7 @@ int setbufstat(node n, unsigned int slot, int status){
 
 
 
-ssize_t read_lb(struct inslot_l* in, void* buf, size_t nbyte){
+ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 
     // Source buffer
     struct l_buf* lb = in->src->buf;
@@ -157,7 +157,7 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
 
     switch (ob->type){
         case LIN_BUF: 
-            return read_lb(n->input_slots[slot], buf, nbyte);
+            return st_readlb(n->input_slots[slot], buf, nbyte);
         case CIR_BUF: 
             return 0; 
         default: 
@@ -180,7 +180,7 @@ ssize_t st_write(node n, unsigned int slot,
 
     switch (n->output_buffers[slot].type){
         case LIN_BUF: 
-            return write_lb(n->output_buffers[slot].buf,
+            return st_lbwrite(n->output_buffers[slot].buf,
                             buf, nbyte);
         case CIR_BUF: 
             return 0; //write_cb(n->output_buffers[slot].buf,
@@ -194,7 +194,7 @@ ssize_t st_write(node n, unsigned int slot,
 
 
 
-struct l_buf* new_lbuf(size_t sizebuf){
+struct l_buf* st_makelb(size_t sizebuf){
     struct l_buf* b = malloc(sizeof(struct l_buf));
     if (b == NULL) return NULL;
 
@@ -221,7 +221,7 @@ struct l_buf* new_lbuf(size_t sizebuf){
 
 
 
-struct c_buf* new_cbuf(size_t sizebuf){
+struct c_buf* st_makecb(size_t sizebuf){
     struct c_buf* b = malloc(sizeof(struct c_buf));
     if (b == NULL) return NULL;
 
@@ -259,7 +259,7 @@ struct c_buf* new_cbuf(size_t sizebuf){
     return b;
 }
 
-struct inslot_l* new_inslot_l(struct out_buf* b){
+struct inslot_l* st_makeinslotl(struct out_buf* b){
     struct inslot_l* is = malloc(sizeof(struct inslot_l));
     if (is == NULL) return NULL;
 
@@ -268,7 +268,7 @@ struct inslot_l* new_inslot_l(struct out_buf* b){
     return is;
 }
 
-struct inslot_l* new_inslot_c(struct out_buf* b){
+struct inslot_l* st_makeinslotc(struct out_buf* b){
     struct inslot_l* is = calloc(1,sizeof(struct inslot_l));
     if (is == NULL) return NULL;
 
@@ -278,7 +278,7 @@ struct inslot_l* new_inslot_c(struct out_buf* b){
 
 
 
-int lbuf_destroy(struct l_buf* b){
+int st_destroylb(struct l_buf* b){
     int err;
     if ((err = pthread_mutex_destroy(&b->mutex)) != 0 ||
         (err = pthread_cond_destroy(&b->cond))   != 0 ){
@@ -290,7 +290,7 @@ int lbuf_destroy(struct l_buf* b){
     return 0;
 }
 
-int cbuf_destroy(struct c_buf* b){
+int st_destroycb(struct c_buf* b){
     free(b->buf);
     int err = pthread_mutex_destroy(&b->access_lock);
     if (err != 0){

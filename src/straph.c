@@ -7,7 +7,7 @@
 // TODO set better naming conventions
 // TODO improve code readablility 
 
-straph new_straph(void){
+straph st_create(void){
     straph s = calloc(1, sizeof (struct s_straph));
     if (s == NULL) return NULL;
 
@@ -27,7 +27,7 @@ straph new_straph(void){
  *       running mode, then sizebuf represent the max size
  *       of the output of the first node
  */ 
-node new_node(void* (*entry)(node)){
+node st_makenode(void* (*entry)(node)){
     node n = calloc(1, sizeof (struct s_node));
     if (n == NULL) return NULL;
     
@@ -48,7 +48,7 @@ node new_node(void* (*entry)(node)){
 
 
 
-int add_start_node(straph g, node n){
+int st_addnode(straph g, node n){
     void* tmp = realloc(g->entries, 
                 (g->nb_entries+1)*sizeof(node));
     if (tmp == NULL) return -1;
@@ -66,9 +66,9 @@ int add_start_node(straph g, node n){
 
 
 
-/* Results are indefined if set_buffer on node != INACTIVE */
-int set_buffer(node n, unsigned int idx_buf, 
-               unsigned char buftype, size_t bufsize){
+/* Results are indefined if st_setbuffer on node != INACTIVE */
+int st_setbuffer(node n, unsigned int idx_buf, 
+    unsigned char buftype, size_t bufsize){
 
     /* Increase array size if necessary */
     if (n->nb_outbufs <= idx_buf){
@@ -88,9 +88,9 @@ int set_buffer(node n, unsigned int idx_buf,
     /* Create new buffer */
     void* newbuf;
     switch (buftype){
-        case CIR_BUF: newbuf = new_cbuf(bufsize);
+        case CIR_BUF: newbuf = st_makecb(bufsize);
             break;
-        case LIN_BUF: newbuf = new_lbuf(bufsize);
+        case LIN_BUF: newbuf = st_makelb(bufsize);
             break;
         default: errno = EINVAL;
                  return -1;
@@ -101,9 +101,9 @@ int set_buffer(node n, unsigned int idx_buf,
     /* Free old buffer */
     if (n->output_buffers[idx_buf].buf != NULL){
         switch (n->output_buffers[idx_buf].type){
-            case LIN_BUF: lbuf_destroy(n->output_buffers[idx_buf].buf);
+            case LIN_BUF: st_destroylb(n->output_buffers[idx_buf].buf);
                 break;
-            case CIR_BUF: cbuf_destroy(n->output_buffers[idx_buf].buf);
+            case CIR_BUF: st_destroycb(n->output_buffers[idx_buf].buf);
                 break;
             default: free(newbuf);
                      errno = EINVAL;
@@ -122,8 +122,8 @@ int set_buffer(node n, unsigned int idx_buf,
 
 // TODO function to link nodes without IO
 
-int link_nodes(node a, unsigned int idx_buf, 
-               node b, unsigned int islot, unsigned char mode){
+int st_nlink(node a, unsigned int idx_buf, 
+    node b, unsigned int islot, unsigned char mode){
 
     // Check index buffer
     if (idx_buf >= a->nb_outbufs){
@@ -161,13 +161,7 @@ int link_nodes(node a, unsigned int idx_buf,
 
 
 
-
-
-
-
-
-
-int launcher(struct linked_fifo* lf){
+int st_starter(struct linked_fifo* lf){
 
     unsigned int i;
     node n;
@@ -178,7 +172,7 @@ int launcher(struct linked_fifo* lf){
             if (errno == ENOENT) break;
             return -1;
         }
-        if (launch_node(n) != INACTIVE) continue;
+        if (st_nstart(n) != INACTIVE) continue;
 
         /* Collect node's neighbours */
         for (i = 0; i < n->nb_neigh; i++){
@@ -195,15 +189,17 @@ int launcher(struct linked_fifo* lf){
     return 0;
 }
 
+
+
 // XXX what about ret in case of error ??
-void* routine_wrapper(void* n){
+void* st_threadwrapper(void* n){
 
     node nd = (node) n;
 
     /* Activate out buffers */
     unsigned int i;
     for (i = 0; i < nd->nb_outbufs; i++){
-        setbufstat(nd, i, BUF_ACTIVE);
+        st_bufstat(nd, i, BUF_ACTIVE);
     }
 
     void* ret = nd->entry(n);
@@ -237,11 +233,11 @@ void* routine_wrapper(void* n){
         }
     } 
 
-    if (launcher(&lf) == -1) lf_drop(&lf);
+    if (st_starter(&lf) == -1) lf_drop(&lf);
 
     /* Deactivate out buffers */
     for (i = 0; i < nd->nb_outbufs; i++){
-        setbufstat(nd,i, BUF_INACTIVE);
+        st_bufstat(nd,i, BUF_INACTIVE);
     }
 
     return ret;
@@ -250,7 +246,7 @@ void* routine_wrapper(void* n){
 
 
 /* returns previous status */
-int launch_node(node n){
+int st_nstart(node n){
 
     /* Lock the node */
     int err;
@@ -276,10 +272,10 @@ int launch_node(node n){
 
         switch (((struct out_buf*)n->input_slots[i])->type){
             case LIN_BUF:
-                islot = new_inslot_l((struct out_buf*) n->input_slots[i]);
+                islot = st_makeinslotl((struct out_buf*) n->input_slots[i]);
                 break;
             case CIR_BUF:
-                islot = new_inslot_c((struct out_buf*) n->input_slots[i]);
+                islot = st_makeinslotc((struct out_buf*) n->input_slots[i]);
                 break;
             default: 
                 errno = EINVAL;
@@ -298,7 +294,7 @@ int launch_node(node n){
 
 
     /* Launch thread */
-    err = pthread_create(&n->id, NULL, routine_wrapper, n);
+    err = pthread_create(&n->id, NULL, st_threadwrapper, n);
     if (err != 0){
         pthread_spin_unlock(&n->launch_lock);
         errno = err;
@@ -316,7 +312,7 @@ int launch_node(node n){
 }
 
 
-int join_straph(straph s){
+int st_join(straph s){
      
     struct linked_fifo lf;
     lf_init(&lf);
@@ -365,7 +361,7 @@ error:
 }
 
 
-int node_destroy(node n){
+int st_ndestroy(node n){
     unsigned int i;
 
     /* Destroy out bufs */
@@ -375,9 +371,9 @@ int node_destroy(node n){
             if (n->output_buffers[i].buf == NULL) continue;
 
             switch (n->output_buffers[i].type){
-                case LIN_BUF: lbuf_destroy(n->output_buffers[i].buf);
+                case LIN_BUF: st_destroylb(n->output_buffers[i].buf);
                     break;
-                case CIR_BUF: cbuf_destroy(n->output_buffers[i].buf);
+                case CIR_BUF: st_destroycb(n->output_buffers[i].buf);
                     break;
                 default: errno = EINVAL;
                          return -1;  
@@ -403,7 +399,7 @@ int node_destroy(node n){
 
 
 // TODO
-int straph_destroy(straph s){
+int st_destroy(straph s){
     unsigned int i;
     node n = NULL; 
     struct linked_fifo lf1,lf2;
@@ -441,7 +437,7 @@ int straph_destroy(straph s){
 
     /* Destroy collected nodes */
     while ((n = lf_pop(&lf2))){
-        if (node_destroy(n) == -1) goto error;
+        if (st_ndestroy(n) == -1) goto error;
     }
     if (errno != ENOENT) goto error;
 
@@ -458,7 +454,7 @@ error:
 }
 
 
-int launch_straph(straph s){
+int st_start(straph s){
 
     struct linked_fifo lf;
     lf_init(&lf);
@@ -472,7 +468,7 @@ int launch_straph(straph s){
         }
     }
 
-    if (launcher(&lf) == -1){
+    if (st_starter(&lf) == -1){
         lf_drop(&lf);
         return -1;
     }
