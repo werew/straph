@@ -95,11 +95,45 @@ int st_addnode(straph st, node nd){
 
 
 
-/* Results are indefined if st_setbuffer on node != INACTIVE */
 /**
  * @brief Set an output buffer for the given node
  *
+ * Add or modify a buffer of a given node. Buffers are
+ * used to pass data from node to node. Results are indefined 
+ * if this function is used to set a buffer on a node which is
+ * not inactive.
  *
+ * @param nd node on which set the buffer
+ * @param bufindex at which the buffer should be set. If bufindex
+ *        is bigger than the actual number of buffers than all
+ *        the buffers with an index between bufindex and the number
+ *        of buffers will be set as NO_BUF
+ *        TODO implement this last part
+ * @param buftype type of the buffer, possible values are:
+ *        LIN_BUF - linear buffer, provides a read/write capability
+ *                  limited to bufsize. The writes who exceed the
+ *                  size of the buffer are ignored. For most of the 
+ *                  cases this is the recommended type when passing
+ *                  data from node executed sequentially, or when the
+ *                  size of the passed data is known and not too big.
+ *        CIR_BUF - circular buffer, provides an unlimited read/write
+ *                  capability. The speed of the writes/reads depends
+ *                  on the speed of the other (e.g. a fast writer can
+ *                  be slowed down by slow readers). If the reader 
+ *                  has been executed in SEQ_MODE then it will acceed
+ *                  only to the last portion of data written by the
+ *                  writer before terminating. The size of this 
+ *                  portion is undefined and depends on the size of
+ *                  the buffer and the size of each write. 
+ *                  TODO implement this last part
+ *        NO_BUF  - no buffer will be set, every buffer previously 
+ *                  set at bufindex will be eliminated 
+ *                  TODO implement this last part
+ * @param bufsize size of the buffer. A size of zero has the same
+ *        effect as NO_BUF. When NO_BUF is given as buftype this
+ *        parameter is ignored.
+ * @return 0 in case of success, -1 otherwise. This function sets
+ *         errno.
  */
 int st_setbuffer(node nd, unsigned int bufindex, 
     unsigned char buftype, size_t bufsize){
@@ -109,7 +143,7 @@ int st_setbuffer(node nd, unsigned int bufindex,
     struct out_buf *bufs;      /* New array of bufs */
     void *newbuf;              /* New buffer */
 
-    /* Extend the array if bufindex is beyond the capacity */
+    /* Extend the array if bufindex is beyond the actual capacity */
     if (nd->nb_outbufs <= bufindex){
 
         totbufs = bufindex + 1;
@@ -117,7 +151,7 @@ int st_setbuffer(node nd, unsigned int bufindex,
             totbufs * sizeof(struct out_buf));
         if (bufs == NULL) return -1;
 
-        /* Set to NULL all the new unused structs */
+        /* Set to NULL all the new unused structs (slots) */
         nb_newslots = totbufs - nd->nb_outbufs;
         memset(bufs + nd->nb_outbufs, 0, 
             nb_newslots * sizeof(struct out_buf));
