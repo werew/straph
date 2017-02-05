@@ -104,25 +104,25 @@ int st_addnode(straph st, node nd){
 int st_setbuffer(node nd, unsigned int bufindex, 
     unsigned char buftype, size_t bufsize){
 
-    void *newbuf;
-    unsigned int nb_newstructs;
-    struct out_buf* tmp;
-    unsigned int nb_bufs;
+    unsigned int totbufs;      /* New total number of buffers */
+    unsigned int nb_newslots;  /* Number of new slots for buffers */
+    struct out_buf *bufs;      /* New array of bufs */
+    void *newbuf;              /* New buffer */
 
     /* Extend the array if bufindex is beyond the capacity */
     if (nd->nb_outbufs <= bufindex){
 
-        nb_bufs = bufindex + 1;
-        tmp = realloc(nd->output_buffers, 
-            nb_bufs * sizeof(struct out_buf));
-        if (tmp == NULL) return -1;
+        totbufs = bufindex + 1;
+        bufs = realloc(nd->output_buffers, 
+            totbufs * sizeof(struct out_buf));
+        if (bufs == NULL) return -1;
 
         /* Set to NULL all the new unused structs */
-        nb_newstructs = nb_bufs - nd->nb_outbufs;
-        memset(tmp+nd->nb_outbufs, 0, 
-            nb_newstructs * sizeof(struct out_buf));
+        nb_newslots = totbufs - nd->nb_outbufs;
+        memset(bufs + nd->nb_outbufs, 0, 
+            nb_newslots * sizeof(struct out_buf));
 
-        nd->output_buffers = tmp;
+        nd->output_buffers = bufs;
         nd->nb_outbufs = bufindex+1;
     }
 
