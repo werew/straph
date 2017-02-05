@@ -40,4 +40,7 @@ this is some code;  /* Here is a multiline
 
 Pointers: void *p and not void* p
 
+Breaking a line:
 
+this_is_a(very, very, very long function, call, when
+    I go to a new line I just add one more identation);
