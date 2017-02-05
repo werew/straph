@@ -264,6 +264,7 @@ struct l_buf* st_makelb(size_t sizebuf);
 struct c_buf* st_makecb(size_t sizebuf);
 int st_destroycb(struct c_buf* b);
 int st_destroylb(struct l_buf* b);
+int st_destroyb(struct out_buf *buf);
 struct inslot_l* st_makeinslotl(struct out_buf* b);
 struct inslot_l* st_makeinslotc(struct out_buf* b);
 int st_nstart(node n);

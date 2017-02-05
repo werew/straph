@@ -338,3 +338,12 @@ void* st_makeb(unsigned char buftype, size_t bufsize){
     }
 
 }
+
+int st_destroyb(struct out_buf *buf){
+    switch (buf->type){
+        case LIN_BUF: return st_destroylb(buf->buf);
+        case CIR_BUF: return st_destroycb(buf->buf);
+        default: errno = EINVAL;
+                 return -1;  
+    }
+}

@@ -132,14 +132,9 @@ int st_setbuffer(node nd, unsigned int bufindex,
 
     /* Destroy old buffer if necessary */
     if (nd->output_buffers[bufindex].buf != NULL){
-        switch (nd->output_buffers[bufindex].type){
-            case LIN_BUF: st_destroylb(nd->output_buffers[bufindex].buf);
-                break;
-            case CIR_BUF: st_destroycb(nd->output_buffers[bufindex].buf);
-                break;
-            default: free(newbuf);
-                     errno = EINVAL;
-                     return -1;  
+        if (st_destroyb(&nd->output_buffers[bufindex]) == -1){
+            free(newbuf);
+            return -1;
         }
     }
 
