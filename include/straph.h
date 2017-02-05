@@ -255,7 +255,8 @@ int st_join(straph s);
 int st_ndestroy(node n);
 int st_destroy(straph s);
 int st_setbuffer(node n, unsigned int idx_buf, unsigned char buftype, size_t bufsize);
-int st_nlink(node a, unsigned int idx_buf, node b, unsigned int islot, unsigned char mode);
+int st_nlink(node a, node b, unsigned char mode);
+int st_addflow(node a, unsigned int idx_buf, node b, unsigned int islot);
 int st_bufstat(node n, unsigned int slot, int status);
 
 

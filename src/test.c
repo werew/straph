@@ -44,9 +44,9 @@ int main(void){
     } 
 
     for (i=0; i< NN-1; i++){
-        /*XXX this should not be necessary */
         if (st_setbuffer(ns[i], 0, LIN_BUF, 10) != 0) fail("st_setbuffer");
-        if (st_nlink(ns[i],0,ns[i+1],0, PAR_MODE) != 0) fail("link_nodes");
+        if (st_nlink(ns[i],ns[i+1], PAR_MODE) != 0) fail("link_nodes");
+        if (st_addflow(ns[i],0,ns[i+1],0) != 0) fail("st_addflow");
     }
     
     if (st_addnode(s, ns[0]) != 0) fail("addnode");

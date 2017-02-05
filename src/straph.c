@@ -188,16 +188,8 @@ int st_setbuffer(node nd, unsigned int bufindex,
 
 
 /* TODO function to link nodes without IO */
-
-int st_nlink(node a, unsigned int idx_buf, 
-    node b, unsigned int islot, unsigned char mode){
+int st_nlink(node a, node b, unsigned char mode){
     void *tmp;
-
-    /* Check index buffer */
-    if (idx_buf >= a->nb_outbufs){
-        errno = EINVAL;
-        return -1;
-    }
 
     /* Add neighbour to 'a' and set the mode */
     tmp = realloc(a->neigh, (a->nb_neigh+1)*
@@ -207,6 +199,28 @@ int st_nlink(node a, unsigned int idx_buf,
     a->neigh[a->nb_neigh].n = b;
     a->neigh[a->nb_neigh++].run_mode = mode;
 
+    return 0;
+}
+
+
+
+
+int st_addflow(node a, unsigned int idx_buf, 
+               node b, unsigned int islot){
+    void *tmp;
+
+    /* Check index buffer */
+    if (idx_buf >= a->nb_outbufs){
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* 
+     TODO: 
+        - increment the count on the buffer
+        - decrement the count of the previous buffer
+          if the slot was already used
+    */
 
     /* Add a new input slot to 'b' */
     if (b->nb_inslots <= islot){
