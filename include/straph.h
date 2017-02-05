@@ -31,8 +31,9 @@ typedef struct rw_slock {
 /**************** Node's output buffers ******************/
 
 /* Buffer types */
-#define CIR_BUF  0 
-#define LIN_BUF  1
+#define NO_BUF   0 
+#define CIR_BUF  1 
+#define LIN_BUF  2
 
 /* Buffer status */
 #define BUF_READY    0
@@ -60,8 +61,7 @@ struct l_buf {
     unsigned int of_empty; /* Offset to the unwritten zone */
     
     char status;           /* Indicates if the buf is 
-                              receiving data o not       
-                           */
+                              receiving data or not   */
 
     pthread_mutex_t mutex; /* To regulate of_empty access  */
     pthread_cond_t  cond;  /* To signal new available data */

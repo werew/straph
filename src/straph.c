@@ -108,7 +108,6 @@ int st_addnode(straph st, node nd){
  *        is bigger than the actual number of buffers than all
  *        the buffers with an index between bufindex and the number
  *        of buffers will be set as NO_BUF
- *        TODO implement this last part
  * @param buftype type of the buffer, possible values are:
  *        LIN_BUF - linear buffer, provides a read/write capability
  *                  limited to bufsize. The writes who exceed the
@@ -128,7 +127,6 @@ int st_addnode(straph st, node nd){
  *                  TODO implement this last part
  *        NO_BUF  - no buffer will be set, every buffer previously 
  *                  set at bufindex will be eliminated 
- *                  TODO implement this last part
  * @param bufsize size of the buffer. A size of zero has the same
  *        effect as NO_BUF. When NO_BUF is given as buftype this
  *        parameter is ignored.
@@ -151,9 +149,13 @@ int st_setbuffer(node nd, unsigned int bufindex,
             totbufs * sizeof(struct out_buf));
         if (bufs == NULL) return -1;
 
-        /* Set to NULL all the new unused structs (slots) */
+        /* 
+          Set all the new unused structs (slots) with:
+          buf = NULL and size = 0.
+          Those buffers are considered as having type  NO_BUF 
+        */
         nb_newslots = totbufs - nd->nb_outbufs;
-        memset(bufs + nd->nb_outbufs, 0, 
+        memset(bufs + nd->nb_outbufs, 0,
             nb_newslots * sizeof(struct out_buf));
 
         nd->output_buffers = bufs;
@@ -161,8 +163,12 @@ int st_setbuffer(node nd, unsigned int bufindex,
     }
 
     /* Create new buffer */
-    newbuf = st_makeb(buftype, bufsize);
-    if (newbuf == NULL) return -1;
+    if (buftype != NO_BUF && bufsize > 0){
+        newbuf = st_makeb(buftype, bufsize);
+        if (newbuf == NULL) return -1;
+    } else {
+        newbuf = NULL;
+    }
 
     /* Destroy old buffer if necessary */
     if (nd->output_buffers[bufindex].buf != NULL){
