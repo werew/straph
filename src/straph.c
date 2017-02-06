@@ -188,14 +188,39 @@ int st_setbuffer(node nd, unsigned int bufindex,
 
 
 /* TODO function to link nodes without IO */
+/**
+ * @brief Creates an execution-edge between two nodes
+ *
+ * Links two nodes creating an execution-edge. 
+ * An execution-edge is a directed edge between two nodes.
+ * After a node has been launched all the execution-edges
+ * from that node are axpected in order to execute all linked
+ * nodes. Let's consider the following call to st_nlink:
+ *      st_nlink(a, b, PAR_MODE)
+ * In this case an execution-edge will be created from node a
+ * to node b: after a has been launched b will be launched.
+ * It's important to note that the execution flow is 
+ * indipendent from the topological order of the nodes.
+ * 
+ * @param a node source of the execution-edge
+ * @param b node destination of the execution-edge
+ * @param mode mode of execution. Available options are:
+ *        SEQ_MODE: wait for the termination of node a before
+ *                  launching node b
+ *        PAR_MODE: don't wait for node a to terminate, execute
+ *                  node b in parallel
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
 int st_nlink(node a, node b, unsigned char mode){
-    void *tmp;
+    void *new_neigh;
 
     /* Add neighbour to 'a' and set the mode */
-    tmp = realloc(a->neigh, (a->nb_neigh+1)*
-                 sizeof(struct neighbour));
-    if (tmp == NULL) return -1;
-    a->neigh = tmp;
+    new_neigh = realloc(a->neigh, (a->nb_neigh+1)*
+        sizeof(struct neighbour));
+    if (new_neigh == NULL) return -1;
+
+    a->neigh = new_neigh;
     a->neigh[a->nb_neigh].n = b;
     a->neigh[a->nb_neigh++].run_mode = mode;
 
