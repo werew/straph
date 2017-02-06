@@ -198,19 +198,19 @@ typedef struct s_node {
 
     /* Input flow */    
     unsigned int nb_inslots;         /* Number of input slots */
-    void ** input_slots;             /* Pointers to the output buffer
+    void ** inslots;                 /* Pointers to the output buffer
                                         of the source nodes when not 
                                         active. Pointers to the input
                                         slots when active */
 
     /* Output flow */    
-    unsigned int nb_outbufs;         /* Number of output buffers */
-    struct out_buf* output_buffers;  /* Output buffers */
+    unsigned int nb_outslots;         /* Number of output buffers */
+    struct out_buf* outslots;         /* Output buffers */
 
 
-    /* Edges */
-    struct neighbour* neigh;         /* Adjacency list */
+    /* Execution flows */
     unsigned int nb_neigh;           /* Number of neighbours */
+    struct neighbour* neigh;         /* Adjacency list */
 
 
 } *node;

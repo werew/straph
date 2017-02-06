@@ -76,15 +76,15 @@ int st_bufstatlb(struct l_buf* lb, int status){
 
 int st_bufstat(node n, unsigned int slot, int status){
 
-    if (n->nb_outbufs <= slot               ||
-        n->output_buffers[slot].buf == NULL ){
+    if (n->nb_outslots <= slot               ||
+        n->outslots[slot].buf == NULL ){
         errno = ENOENT;
         return -1;
     }
 
-    switch (n->output_buffers[slot].type){
+    switch (n->outslots[slot].type){
         case LIN_BUF: 
-            return st_bufstatlb(n->output_buffers[slot].buf, status);
+            return st_bufstatlb(n->outslots[slot].buf, status);
         case CIR_BUF: 
             return 0; 
         default: 
@@ -156,19 +156,19 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
     struct out_buf* ob;
 
     if (n->nb_inslots <= slot        ||
-        n->input_slots[slot] == NULL ){
+        n->inslots[slot] == NULL ){
         return 0;
     }
 
     /* Get out buffer */
-    islot = n->input_slots[slot];
+    islot = n->inslots[slot];
     ob = islot->src; 
 
     if (ob == NULL) return 0;
 
     switch (ob->type){
         case LIN_BUF: 
-            return st_readlb(n->input_slots[slot], buf, nbyte);
+            return st_readlb(n->inslots[slot], buf, nbyte);
         case CIR_BUF: 
             return 0; 
         default: 
@@ -186,17 +186,17 @@ ssize_t st_write(node n, unsigned int slot,
      If no slot is available (user choice) 
      act as the write was successful 
     */
-    if (n->nb_outbufs <= slot               ||
-        n->output_buffers[slot].buf == NULL ){
+    if (n->nb_outslots <= slot               ||
+        n->outslots[slot].buf == NULL ){
         return nbyte;
     }
 
-    switch (n->output_buffers[slot].type){
+    switch (n->outslots[slot].type){
         case LIN_BUF: 
-            return st_lbwrite(n->output_buffers[slot].buf,
+            return st_lbwrite(n->outslots[slot].buf,
                             buf, nbyte);
         case CIR_BUF: 
-            return 0; /*write_cb(n->output_buffers[slot].buf,
+            return 0; /*write_cb(n->outslots[slot].buf,
                        buf, nbyte); */
         default: 
             errno = EINVAL;

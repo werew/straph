@@ -142,10 +142,10 @@ int st_setbuffer(node nd, unsigned int bufindex,
     void *newbuf;              /* New buffer */
 
     /* Extend the array if bufindex is beyond the actual capacity */
-    if (nd->nb_outbufs <= bufindex){
+    if (nd->nb_outslots <= bufindex){
 
         totbufs = bufindex + 1;
-        bufs = realloc(nd->output_buffers, 
+        bufs = realloc(nd->outslots, 
             totbufs * sizeof(struct out_buf));
         if (bufs == NULL) return -1;
 
@@ -154,12 +154,12 @@ int st_setbuffer(node nd, unsigned int bufindex,
           buf = NULL and size = 0.
           Those buffers are considered as having type  NO_BUF 
         */
-        nb_newslots = totbufs - nd->nb_outbufs;
-        memset(bufs + nd->nb_outbufs, 0,
+        nb_newslots = totbufs - nd->nb_outslots;
+        memset(bufs + nd->nb_outslots, 0,
             nb_newslots * sizeof(struct out_buf));
 
-        nd->output_buffers = bufs;
-        nd->nb_outbufs = bufindex+1;
+        nd->outslots = bufs;
+        nd->nb_outslots = bufindex+1;
     }
 
     /* Create new buffer */
@@ -171,16 +171,16 @@ int st_setbuffer(node nd, unsigned int bufindex,
     }
 
     /* Destroy old buffer if necessary */
-    if (nd->output_buffers[bufindex].buf != NULL){
-        if (st_destroyb(&nd->output_buffers[bufindex]) == -1){
+    if (nd->outslots[bufindex].buf != NULL){
+        if (st_destroyb(&nd->outslots[bufindex]) == -1){
             free(newbuf);
             return -1;
         }
     }
 
     /* Update buff */
-    nd->output_buffers[bufindex].type = buftype;
-    nd->output_buffers[bufindex].buf  = newbuf;
+    nd->outslots[bufindex].type = buftype;
+    nd->outslots[bufindex].buf  = newbuf;
 
     return 0;
 }
@@ -229,13 +229,17 @@ int st_nlink(node a, node b, unsigned char mode){
 
 
 
-
-int st_addflow(node a, unsigned int idx_buf, 
-               node b, unsigned int islot){
+/**
+ * @brief Add an io-edge between two nodes
+ *
+ * 
+ */
+int st_addflow(node a, unsigned int outslot,
+               node b, unsigned int inslot ){
     void *tmp;
 
     /* Check index buffer */
-    if (idx_buf >= a->nb_outbufs){
+    if (outslot >= a->nb_outslots){
         errno = EINVAL;
         return -1;
     }
@@ -248,20 +252,20 @@ int st_addflow(node a, unsigned int idx_buf,
     */
 
     /* Add a new input slot to 'b' */
-    if (b->nb_inslots <= islot){
-        /* Realloc if islot is beyond the capacity */
-        tmp = realloc(b->input_slots, (islot+1)*sizeof(void*));
+    if (b->nb_inslots <= inslot){
+        /* Realloc if inslot is beyond the capacity */
+        tmp = realloc(b->inslots, (inslot+1)*sizeof(void*));
         if (tmp == NULL){a->nb_neigh--; return -1;}
 
         /* Set to NULL all new slots */
         memset((void**) tmp + b->nb_inslots, 0,
-                (islot+1 - b->nb_inslots)*sizeof(void*));
+                (inslot+1 - b->nb_inslots)*sizeof(void*));
 
-        b->input_slots = tmp;
-        b->nb_inslots = islot+1;
+        b->inslots = tmp;
+        b->nb_inslots = inslot+1;
     }
 
-    b->input_slots[islot] = &a->output_buffers[idx_buf];
+    b->inslots[inslot] = &a->outslots[outslot];
 
     return 0;
 }
@@ -312,7 +316,7 @@ void* st_threadwrapper(void *n){
     nd = (node) n;
 
     /* Activate out buffers */
-    for (i = 0; i < nd->nb_outbufs; i++){
+    for (i = 0; i < nd->nb_outslots; i++){
         st_bufstat(nd, i, BUF_ACTIVE);
     }
 
@@ -323,7 +327,7 @@ void* st_threadwrapper(void *n){
 
     /* Free input slots */
     for (i = 0; i < nd->nb_inslots; i++){
-        is = nd->input_slots[i];
+        is = nd->inslots[i];
         if (is == NULL) continue;
 
         src = is->src;         
@@ -332,7 +336,7 @@ void* st_threadwrapper(void *n){
         }
         free(is);
 
-        nd->input_slots[i] = src;   /* Restore src */
+        nd->inslots[i] = src;   /* Restore src */
     }
 
     /* Launch inactives neighbours */
@@ -349,7 +353,7 @@ void* st_threadwrapper(void *n){
     if (st_starter(&lf) == -1) lf_drop(&lf);
 
     /* Deactivate out buffers */
-    for (i = 0; i < nd->nb_outbufs; i++){
+    for (i = 0; i < nd->nb_outslots; i++){
         st_bufstat(nd,i, BUF_INACTIVE);
     }
 
@@ -382,14 +386,14 @@ int st_nstart(node n){
     for (i = 0; i < n->nb_inslots; i++){
         void* islot;
 
-        if (n->input_slots[i] == NULL) continue;
+        if (n->inslots[i] == NULL) continue;
 
-        switch (((struct out_buf*)n->input_slots[i])->type){
+        switch (((struct out_buf*)n->inslots[i])->type){
             case LIN_BUF:
-                islot = st_makeinslotl((struct out_buf*) n->input_slots[i]);
+                islot = st_makeinslotl((struct out_buf*) n->inslots[i]);
                 break;
             case CIR_BUF:
-                islot = st_makeinslotc((struct out_buf*) n->input_slots[i]);
+                islot = st_makeinslotc((struct out_buf*) n->inslots[i]);
                 break;
             default: 
                 errno = EINVAL;
@@ -402,8 +406,8 @@ int st_nstart(node n){
                 return -1;
         }
 
-        ((struct inslot_l*) islot)->src = n->input_slots[i];
-        n->input_slots[i] = islot;
+        ((struct inslot_l*) islot)->src = n->inslots[i];
+        n->inslots[i] = islot;
     }
 
 
@@ -483,25 +487,25 @@ int st_ndestroy(node n){
     unsigned int i;
 
     /* Destroy out bufs */
-    if (n->output_buffers != NULL){
-        for (i = 0; i < n->nb_outbufs; i++){
+    if (n->outslots != NULL){
+        for (i = 0; i < n->nb_outslots; i++){
         
-            if (n->output_buffers[i].buf == NULL) continue;
+            if (n->outslots[i].buf == NULL) continue;
 
-            switch (n->output_buffers[i].type){
-                case LIN_BUF: st_destroylb(n->output_buffers[i].buf);
+            switch (n->outslots[i].type){
+                case LIN_BUF: st_destroylb(n->outslots[i].buf);
                     break;
-                case CIR_BUF: st_destroycb(n->output_buffers[i].buf);
+                case CIR_BUF: st_destroycb(n->outslots[i].buf);
                     break;
                 default: errno = EINVAL;
                          return -1;  
             }
         }
 
-        free(n->output_buffers);
+        free(n->outslots);
     }
 
-    free(n->input_slots);
+    free(n->inslots);
     free(n->neigh);
 
     err = pthread_spin_destroy(&n->launch_lock);
