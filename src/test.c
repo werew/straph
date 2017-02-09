@@ -22,7 +22,7 @@ void _fail(const char* msg, int line, const char* func){
 
 int asd;
 void* test(node n){
-    char buf[10];
+    char buf[10] = {0x0};
     size_t l = st_read(n,0,buf,10);
     printf("%d--> length: %ld \"%s\"\n",asd++,l,buf); 
     st_write(n,0,"hello",6);
@@ -42,6 +42,7 @@ int main(void){
    
     node tt; 
     int i;
+    asd = 0;
     for (i =0; i<NN; i++){
         ns[i] = st_makenode(test);
         if (ns[i] == NULL) fail("makenode");
