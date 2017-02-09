@@ -192,8 +192,9 @@ typedef struct s_node {
                                         executions */
 
     void* (*entry)(struct s_node*);  /* Entry point of the module */
-    unsigned int nb_parents;
-    unsigned int nb_startrequests;
+    unsigned int nb_parents;         /* Nb of parents liked to this node */
+    unsigned int nb_startrequests;   /* Nb of times a parent tried to 
+                                        launch this node */
     unsigned char status;            /* Status of this node */
     pthread_t id;                    /* Id of the module */
     void* ret;                       /* Return value */

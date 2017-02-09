@@ -60,6 +60,8 @@ node st_makenode(void* (*entry)(node)){
 }
 
 
+
+
 /**
  * @brief Add a node to the a straph
  *
@@ -192,14 +194,11 @@ int st_setbuffer(node nd, unsigned int bufindex,
  * @brief Creates an execution-edge between two nodes
  *
  * Links two nodes creating an execution-edge. 
- * An execution-edge is a directed edge between two nodes.
- * After a node has been launched all the execution-edges
- * from that node are axpected in order to execute all linked
- * nodes. Let's consider the following call to st_nlink:
- *      st_nlink(a, b, PAR_MODE)
- * In this case an execution-edge will be created from node a
- * to node b: after a has been launched b will be launched.
- * TODO topological order
+ * Execution-edges are directed edges between two nodes
+ * and define the order of the execution of each node.
+ * Nodes are executed following the topological order
+ * defined by the execution-edges.
+ *
  * @param a node source of the execution-edge
  * @param b node destination of the execution-edge
  * @param mode mode of execution. Available options are:
