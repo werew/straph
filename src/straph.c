@@ -199,9 +199,7 @@ int st_setbuffer(node nd, unsigned int bufindex,
  *      st_nlink(a, b, PAR_MODE)
  * In this case an execution-edge will be created from node a
  * to node b: after a has been launched b will be launched.
- * It's important to note that the execution flow is 
- * indipendent from the topological order of the nodes.
- * 
+ * TODO topological order
  * @param a node source of the execution-edge
  * @param b node destination of the execution-edge
  * @param mode mode of execution. Available options are:
@@ -223,6 +221,7 @@ int st_nlink(node a, node b, unsigned char mode){
     a->neigh = new_neigh;
     a->neigh[a->nb_neigh].n = b;
     a->neigh[a->nb_neigh++].run_mode = mode;
+    b->nb_parents++;
 
     return 0;
 }
@@ -339,17 +338,15 @@ void* st_threadwrapper(void *n){
         nd->inslots[i] = src;   /* Restore src */
     }
 
-    /* Launch inactives neighbours */
+    /* Re-run starter from the neighbours having SEQ_MODE*/
     lf_init(&lf);
-
-    /* Init list with current node's neighbours */
     for (i = 0; i < nd->nb_neigh; i++){
+        if (nd->neigh[i].run_mode != SEQ_MODE) continue;
         if (lf_push(&lf, nd->neigh[i].n) == -1){
             lf_drop(&lf);
             return ret;
         }
     } 
-
     if (st_starter(&lf) == -1) lf_drop(&lf);
 
     /* Deactivate out buffers */
@@ -363,10 +360,12 @@ void* st_threadwrapper(void *n){
 
 
 /* returns previous status */
+/* TODO returning the past status is a bad idea */
 int st_nstart(node n){
 
     int err;
     unsigned int i;
+    unsigned int status;
 
     /* Lock the node */
     if ((err = pthread_spin_lock(&n->launch_lock)) != 0) {
@@ -376,12 +375,20 @@ int st_nstart(node n){
 
     /* Can launch only inactives nodes */
     if (n->status != INACTIVE) {
-        unsigned int status = n->status;
+        status = n->status;
         pthread_spin_unlock(&n->launch_lock);
         return status;
     }
 
-    puts("Launch");
+    /* Add start request */
+    n->nb_startrequests += 1; 
+    if (n->nb_startrequests < n->nb_parents){
+        status = n->status;
+        pthread_spin_unlock(&n->launch_lock);
+        return status;
+    }
+
+     
     /* Create input slots */
     for (i = 0; i < n->nb_inslots; i++){
         void* islot;
@@ -462,7 +469,7 @@ int st_join(straph st){
         }
 
         /* Once joined return inactive */
-        nd->status = INACTIVE;
+        nd->status = INACTIVE; /* TODO do it in st_rewind */
 
         /* Collect neighbours */
         for (i = 0; i < nd->nb_neigh; i++){
@@ -471,7 +478,8 @@ int st_join(straph st){
         } 
     }
 
-    /*TODO st_rewind (set BUF_READY, and other stuffs) */
+    /*TODO st_rewind (set BUF_READY, status INACTIVE,
+      nb_startrequests, and other stuffs) */
 
     return 0;
 
