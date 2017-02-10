@@ -304,12 +304,17 @@ int st_starter(struct linked_fifo *lf){
     unsigned int i;
 
     while (1){
-        /* Pop and launch node */
+        /* Pop next node */
         if ((nd = lf_pop(lf)) == NULL){
             if (errno == ENOENT) break;
             return -1;
         }
-        if (st_nstart(nd) != INACTIVE) continue;
+
+        /* Launch node */ 
+        switch (st_nstart(nd)){
+            case  0: continue ; /* Not launched */
+            case -1: return -1; /* Error        */
+        }
 
         /* Collect node's neighbours */
         for (i = 0; i < nd->nb_neigh; i++){
@@ -388,22 +393,17 @@ void* st_threadwrapper(void *n){
     nd = (node) n;
 
     /**** Initialization *****/
-
     /* Activate out buffers */
     for (i = 0; i < nd->nb_outslots; i++){
         st_bufstat(nd, i, BUF_ACTIVE);
     }
 
 
-
     /**** Execution *****/
-
     ret = nd->entry(n);
 
 
-
     /**** Prologue *****/
-
     st_ndown(nd);
 
     /* Re-run starter from the neighbours having SEQ_MODE*/
@@ -421,84 +421,103 @@ void* st_threadwrapper(void *n){
     return ret;
 }
 
-
-
-/* returns previous status */
-/* TODO returning the past status is a bad idea */
-int st_nstart(node n){
-
-    int err;
+int st_nup(node nd){
     unsigned int i;
-    unsigned int status;
 
+    /* Create input slots */
+    for (i = 0; i < nd->nb_inslots; i++){
+        void* islot;
+
+        if (nd->inslots[i] == NULL) continue;
+
+        switch (((struct out_buf*)nd->inslots[i])->type){
+            case LIN_BUF:
+                islot = st_makeinslotl((struct out_buf*) nd->inslots[i]);
+                break;
+            case CIR_BUF:
+                islot = st_makeinslotc((struct out_buf*) nd->inslots[i]);
+                break;
+            default: 
+                errno = EINVAL;
+                return -1;
+        }
+
+        if (islot == NULL) return -1;
+
+        ((struct inslot_l*) islot)->src = nd->inslots[i];
+        nd->inslots[i] = islot;
+    }
+
+    /* Update status */
+    nd->status = ACTIVE;
+
+    return 0;
+}
+
+
+
+
+
+/**
+ *
+ * @return -1 in case of error, otherwise 1 if the
+ *          node has been launched or 0 if the node
+ *          is not ready
+ */
+int st_nstart(node nd){
+
+    int err, ret;
     /* Lock the node */
-    if ((err = pthread_spin_lock(&n->launch_lock)) != 0) {
+    if ((err = pthread_spin_lock(&nd->launch_lock)) != 0) {
         errno = err;
         return -1;
     }
 
     /* Can launch only inactives nodes */
-    if (n->status != INACTIVE) {
-        status = n->status;
-        pthread_spin_unlock(&n->launch_lock);
-        return status;
+    if (nd->status != INACTIVE ) {
+        errno = EINVAL;
+        pthread_spin_unlock(&nd->launch_lock);
+        return -1;
     }
-
+        
     /* Add start request */
-    n->nb_startrequests += 1; 
-    if (n->nb_startrequests < n->nb_parents){
-        status = n->status;
-        pthread_spin_unlock(&n->launch_lock);
-        return status;
-    }
+    nd->nb_startrequests += 1; 
+    if (nd->nb_startrequests < nd->nb_parents){
+        /* The node needs to wait for other parents */
+        ret = 0;
 
-     
-    /* Create input slots */
-    for (i = 0; i < n->nb_inslots; i++){
-        void* islot;
+    } else {
+        /* The node is ready to be launched */
 
-        if (n->inslots[i] == NULL) continue;
+        ret = 1;
 
-        switch (((struct out_buf*)n->inslots[i])->type){
-            case LIN_BUF:
-                islot = st_makeinslotl((struct out_buf*) n->inslots[i]);
-                break;
-            case CIR_BUF:
-                islot = st_makeinslotc((struct out_buf*) n->inslots[i]);
-                break;
-            default: 
-                errno = EINVAL;
-                pthread_spin_unlock(&n->launch_lock);
-                return -1;
+        /* Bring node up */
+        if (st_nup(nd) == -1){
+            pthread_spin_unlock(&nd->launch_lock);
+            return -1;
         }
 
-        if (islot == NULL) {
-                pthread_spin_unlock(&n->launch_lock);
-                return -1;
+        /* Launch thread */
+        err = pthread_create(&nd->id, NULL, st_threadwrapper, nd);
+        if (err != 0){
+            pthread_spin_unlock(&nd->launch_lock);
+            errno = err;
+            return -1;
         }
 
-        ((struct inslot_l*) islot)->src = n->inslots[i];
-        n->inslots[i] = islot;
     }
 
-
-    /* Launch thread */
-    err = pthread_create(&n->id, NULL, st_threadwrapper, n);
-    if (err != 0){
-        pthread_spin_unlock(&n->launch_lock);
+    /* Leave */
+    if ((err = pthread_spin_unlock(&nd->launch_lock)) != 0) {
         errno = err;
         return -1;
     }
 
-    /* Update status and leave*/
-    n->status = ACTIVE;
-    if ((err = pthread_spin_unlock(&n->launch_lock)) != 0) {
-        errno = err;
-        return -1;
-    }
-    
-    return INACTIVE;
+    return ret;
 }
+
+
+
 
 
 int st_join(straph st){
