@@ -28,6 +28,9 @@ straph st_create(void){
 }
 
 
+
+
+
 /**
  * @brief Creates a new node
  *
@@ -62,6 +65,7 @@ node st_makenode(void* (*entry)(node)){
 
 
 
+
 /**
  * @brief Add a node to the a straph
  *
@@ -89,9 +93,6 @@ int st_addnode(straph st, node nd){
 
     return 0;
 }
-
-
-
 
 
 
@@ -189,6 +190,8 @@ int st_setbuffer(node nd, unsigned int bufindex,
 
 
 
+
+
 /* TODO function to link nodes without IO */
 /**
  * @brief Creates an execution-edge between two nodes
@@ -227,14 +230,23 @@ int st_nlink(node a, node b, unsigned char mode){
 
 
 
+
+
 /**
  * @brief Add an io-edge between two nodes
- *
  * 
+ * Adds an io-edge between two nodes. Io-edges represent
+ * data flows between nodes. 
+ *
+ * @param a writer: node source of the io-edge
+ * @param outslot number of the outslot of a
+ * @param b reader: node destination of the io-edge 
+ * @param inslot number of the receiving inslot of b
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
  */
 int st_addflow(node a, unsigned int outslot,
                node b, unsigned int inslot ){
-    void *tmp;
 
     /* Check index buffer */
     if (outslot >= a->nb_outslots){
@@ -251,8 +263,9 @@ int st_addflow(node a, unsigned int outslot,
 
     /* Add a new input slot to 'b' */
     if (b->nb_inslots <= inslot){
+
         /* Realloc if inslot is beyond the capacity */
-        tmp = realloc(b->inslots, (inslot+1)*sizeof(void*));
+        void *tmp = realloc(b->inslots, (inslot+1)*sizeof(void*));
         if (tmp == NULL){a->nb_neigh--; return -1;}
 
         /* Set to NULL all new slots */
@@ -270,28 +283,43 @@ int st_addflow(node a, unsigned int outslot,
 
 
 
-int st_starter(struct linked_fifo* lf){
 
+
+/**
+ * @brief Launches all the nodes of an initialized fifo and
+ *        their children
+ * 
+ * Launches all the nodes inside the linked list given as argument.
+ * Then launches all the children nodes reachable trough execution edges 
+ * with run_mode == PAR_MODE
+ *
+ * @param lf a pointer to a struct linked_fifo initialized with
+ *        the nodes to launch
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
+int st_starter(struct linked_fifo *lf){
+
+    node nd;
     unsigned int i;
-    node n;
 
     while (1){
         /* Pop and launch node */
-        if ((n = lf_pop(lf)) == NULL){
+        if ((nd = lf_pop(lf)) == NULL){
             if (errno == ENOENT) break;
             return -1;
         }
-        if (st_nstart(n) != INACTIVE) continue;
+        if (st_nstart(nd) != INACTIVE) continue;
 
         /* Collect node's neighbours */
-        for (i = 0; i < n->nb_neigh; i++){
+        for (i = 0; i < nd->nb_neigh; i++){
             /* 
              If the running mode is parallel,
              add the node to the list 
             */
-            if (n->neigh[i].run_mode != PAR_MODE) continue;
+            if (nd->neigh[i].run_mode != PAR_MODE) continue;
            
-            if (lf_push(lf, n->neigh[i].n) == -1){
+            if (lf_push(lf, nd->neigh[i].n) == -1){
                 return -1;
             }
         } 
@@ -303,13 +331,18 @@ int st_starter(struct linked_fifo* lf){
 
 
 /* XXX what about ret in case of error ?? */
+/**
+ * @brief Activates, run and deactivates a node
+ * 
+ *
+ */
 void* st_threadwrapper(void *n){
-    struct linked_fifo lf;
-    struct inslot_c* is;
-    struct out_buf* src;
-    unsigned int i;
-    void *ret;
     node nd;
+    unsigned int i;
+    struct linked_fifo lf;
+    struct inslot_c *inslot;
+    struct out_buf *src;
+    void *ret;
 
     nd = (node) n;
 
@@ -318,6 +351,7 @@ void* st_threadwrapper(void *n){
         st_bufstat(nd, i, BUF_ACTIVE);
     }
 
+    /* Run node */
     ret = nd->entry(n);
 
     /* Update status */
@@ -325,14 +359,14 @@ void* st_threadwrapper(void *n){
 
     /* Free input slots */
     for (i = 0; i < nd->nb_inslots; i++){
-        is = nd->inslots[i];
-        if (is == NULL) continue;
+        inslot = nd->inslots[i];
+        if (inslot == NULL) continue;
 
-        src = is->src;         
+        src = inslot->src;         
         if (src->type == CIR_BUF) {
-            free(is->cache2);
+            free(inslot->cache2);
         }
-        free(is);
+        free(inslot);
 
         nd->inslots[i] = src;   /* Restore src */
     }
