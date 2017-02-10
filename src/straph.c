@@ -421,6 +421,11 @@ void* st_threadwrapper(void *n){
     return ret;
 }
 
+
+
+
+/**
+ * 
 int st_nup(node nd){
     unsigned int i;
 
@@ -459,10 +464,17 @@ int st_nup(node nd){
 
 
 /**
+ * @brief send a start request to an inactive node
  *
+ * Try to launch an inactive node by sending a start request. 
+ * If the number of start requests is equal or greater than
+ * the number of its parents, the node will be launched.
+ *
+ * @param nd node to which send a start request
  * @return -1 in case of error, otherwise 1 if the
  *          node has been launched or 0 if the node
- *          is not ready
+ *          is not ready (not enough start requests)
+ *          to be launched
  */
 int st_nstart(node nd){
 
@@ -519,7 +531,19 @@ int st_nstart(node nd){
 
 
 
-
+/**
+ * @brief join all the threads of a straph
+ *
+ * This function will wait the termination of all 
+ * node's threads and join them. The value retrieved 
+ * by each thread is stored inside the respective node.
+ * After joined the straph is rewinded and every node's
+ * status is brought back from TERMINATED to INACTIVE 
+ *
+ * @param st running straph to join
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
 int st_join(straph st){
     node nd;
     int err;
@@ -569,7 +593,6 @@ int st_join(straph st){
 error:
     lf_drop(&lf);
     return -1;
-
 }
 
 
