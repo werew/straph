@@ -378,32 +378,23 @@ void st_ndown(node nd){
 
 
 
-/* XXX what about ret in case of error ?? */
 /**
  * @brief Activates, run and deactivates a node
  * 
- *
+ * 
  */
 void* st_threadwrapper(void *n){
-    node nd;
     void *ret;
     unsigned int i;
     struct linked_fifo lf;
 
-    nd = (node) n;
+    node nd = (node) n;
 
-    /**** Initialization *****/
-    /* Activate out buffers */
-    for (i = 0; i < nd->nb_outslots; i++){
-        st_bufstat(nd, i, BUF_ACTIVE);
-    }
-
-
-    /**** Execution *****/
+    /* Execute node's routine  */
     ret = nd->entry(n);
 
 
-    /**** Prologue *****/
+    /* Bring node down */
     st_ndown(nd);
 
     /* Re-run starter from the neighbours having SEQ_MODE*/
@@ -425,7 +416,9 @@ void* st_threadwrapper(void *n){
 
 
 /**
- * 
+ * @brief 
+ *
+ *
  */
 int st_nup(node nd){
     int err;
@@ -453,6 +446,12 @@ int st_nup(node nd){
 
         ((struct inslot_l*) islot)->src = nd->inslots[i];
         nd->inslots[i] = islot;
+    }
+
+
+    /* Activate out buffers */
+    for (i = 0; i < nd->nb_outslots; i++){
+        st_bufstat(nd, i, BUF_ACTIVE);
     }
 
     /* Update status */
