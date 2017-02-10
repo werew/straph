@@ -426,7 +426,9 @@ void* st_threadwrapper(void *n){
 
 /**
  * 
+ */
 int st_nup(node nd){
+    int err;
     unsigned int i;
 
     /* Create input slots */
@@ -455,6 +457,13 @@ int st_nup(node nd){
 
     /* Update status */
     nd->status = ACTIVE;
+
+    /* Launch thread */
+    err = pthread_create(&nd->id, NULL, st_threadwrapper, nd);
+    if (err != 0){
+        errno = err;
+        return -1;
+    }
 
     return 0;
 }
@@ -501,22 +510,13 @@ int st_nstart(node nd){
     } else {
         /* The node is ready to be launched */
 
-        ret = 1;
-
         /* Bring node up */
         if (st_nup(nd) == -1){
             pthread_spin_unlock(&nd->launch_lock);
             return -1;
         }
 
-        /* Launch thread */
-        err = pthread_create(&nd->id, NULL, st_threadwrapper, nd);
-        if (err != 0){
-            pthread_spin_unlock(&nd->launch_lock);
-            errno = err;
-            return -1;
-        }
-
+        ret = 1;
     }
 
     /* Leave */
