@@ -279,6 +279,7 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte);
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
 ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
 void* st_makeb(unsigned char buftype, size_t bufsize);
+void st_ndown(node nd);
 
 
 #endif

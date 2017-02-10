@@ -328,37 +328,29 @@ int st_starter(struct linked_fifo *lf){
     return 0;
 }
 
-
-
-/* XXX what about ret in case of error ?? */
 /**
- * @brief Activates, run and deactivates a node
- * 
+ * @brief bring down a node to the status terminated
  *
+ * This function shall be called on a node after it's 
+ * routine has terminated to change it's status to 
+ * TERMINATED and free the data structures not longer
+ * needed.
+ *
+ * @param nd the node to bring down
  */
-void* st_threadwrapper(void *n){
-    node nd;
+void st_ndown(node nd){
+
     unsigned int i;
-    struct linked_fifo lf;
-    struct inslot_c *inslot;
-    struct out_buf *src;
-    void *ret;
-
-    nd = (node) n;
-
-    /* Activate out buffers */
-    for (i = 0; i < nd->nb_outslots; i++){
-        st_bufstat(nd, i, BUF_ACTIVE);
-    }
-
-    /* Run node */
-    ret = nd->entry(n);
 
     /* Update status */
     nd->status = TERMINATED;
 
     /* Free input slots */
     for (i = 0; i < nd->nb_inslots; i++){
+
+        struct inslot_c *inslot;
+        struct out_buf *src;
+
         inslot = nd->inslots[i];
         if (inslot == NULL) continue;
 
@@ -371,6 +363,49 @@ void* st_threadwrapper(void *n){
         nd->inslots[i] = src;   /* Restore src */
     }
 
+    /* Deactivate out buffers */
+    for (i = 0; i < nd->nb_outslots; i++){
+        st_bufstat(nd,i, BUF_INACTIVE);
+    }
+}
+
+
+
+
+
+/* XXX what about ret in case of error ?? */
+/**
+ * @brief Activates, run and deactivates a node
+ * 
+ *
+ */
+void* st_threadwrapper(void *n){
+    node nd;
+    void *ret;
+    unsigned int i;
+    struct linked_fifo lf;
+
+    nd = (node) n;
+
+    /**** Initialization *****/
+
+    /* Activate out buffers */
+    for (i = 0; i < nd->nb_outslots; i++){
+        st_bufstat(nd, i, BUF_ACTIVE);
+    }
+
+
+
+    /**** Execution *****/
+
+    ret = nd->entry(n);
+
+
+
+    /**** Prologue *****/
+
+    st_ndown(nd);
+
     /* Re-run starter from the neighbours having SEQ_MODE*/
     lf_init(&lf);
     for (i = 0; i < nd->nb_neigh; i++){
@@ -382,10 +417,6 @@ void* st_threadwrapper(void *n){
     } 
     if (st_starter(&lf) == -1) lf_drop(&lf);
 
-    /* Deactivate out buffers */
-    for (i = 0; i < nd->nb_outslots; i++){
-        st_bufstat(nd,i, BUF_INACTIVE);
-    }
 
     return ret;
 }
