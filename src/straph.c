@@ -333,6 +333,10 @@ int st_starter(struct linked_fifo *lf){
     return 0;
 }
 
+
+
+
+
 /**
  * @brief bring down a node to the status terminated
  *
@@ -379,9 +383,15 @@ void st_ndown(node nd){
 
 
 /**
- * @brief Activates, run and deactivates a node
+ * @brief wrap the execution of every node's routine
  * 
+ * This function contitues the entry point of every 
+ * new thread created by a node. It wraps the execution
+ * of a node's routine making the thread perform some
+ * additional action: bring node down, launch seq. children
  * 
+ * @param n a void pointer pointing to the node
+ * @return the value returned by the node's routine
  */
 void* st_threadwrapper(void *n){
     void *ret;
@@ -392,7 +402,6 @@ void* st_threadwrapper(void *n){
 
     /* Execute node's routine  */
     ret = nd->entry(n);
-
 
     /* Bring node down */
     st_ndown(nd);
@@ -408,7 +417,6 @@ void* st_threadwrapper(void *n){
     } 
     if (st_starter(&lf) == -1) lf_drop(&lf);
 
-
     return ret;
 }
 
@@ -416,9 +424,13 @@ void* st_threadwrapper(void *n){
 
 
 /**
- * @brief 
+ * @brief bring up a node to the status active
  *
+ * Active and create the thread of an inactive node
  *
+ * @param nd an inactive node to launch
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
  */
 int st_nup(node nd){
     int err;
@@ -595,52 +607,75 @@ error:
 }
 
 
-int st_ndestroy(node n){
+
+
+/**
+ * @brief destroy/free a node
+ * 
+ * Destroy a node by freeing all the data structures
+ * associated to that node
+ *
+ * @param nd the node to destroy
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
+int st_ndestroy(node nd){
     int err;
     unsigned int i;
 
     /* Destroy out bufs */
-    if (n->outslots != NULL){
-        for (i = 0; i < n->nb_outslots; i++){
+    if (nd->outslots != NULL){
+        for (i = 0; i < nd->nb_outslots; i++){
         
-            if (n->outslots[i].buf == NULL) continue;
+            if (nd->outslots[i].buf == NULL) continue;
 
-            switch (n->outslots[i].type){
-                case LIN_BUF: st_destroylb(n->outslots[i].buf);
+            switch (nd->outslots[i].type){
+                case LIN_BUF: st_destroylb(nd->outslots[i].buf);
                     break;
-                case CIR_BUF: st_destroycb(n->outslots[i].buf);
+                case CIR_BUF: st_destroycb(nd->outslots[i].buf);
                     break;
                 default: errno = EINVAL;
                          return -1;  
             }
         }
 
-        free(n->outslots);
+        free(nd->outslots);
     }
 
-    free(n->inslots);
-    free(n->neigh);
+    free(nd->inslots);
+    free(nd->neigh);
 
-    err = pthread_spin_destroy(&n->launch_lock);
+    err = pthread_spin_destroy(&nd->launch_lock);
     if (err != 0){
         errno = err;
         return -1;
     }
 
-    free(n);
+    free(nd);
 
     return 0;
 }
 
 
-/* TODO */
-int st_destroy(straph s){
-    unsigned int i;
-    node n = NULL; 
+
+
+/**
+ * @brief free a straph and all its nodes
+ * 
+ * Free all data structures associated to a straph.
+ * All the nodes reachable from the straph are destroyed.
+ *
+ * @param st straph 
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
+int st_destroy(straph st){
     struct linked_fifo lf1,lf2;
+    unsigned int i;
+    node nd = NULL; 
+
     lf_init(&lf1);
     lf_init(&lf2);
-
 
     /* 
      Collect nodes to avoid double frees (collected 
@@ -648,39 +683,39 @@ int st_destroy(straph s){
     */
 
     
-    for (i = 0; i < s->nb_entries; i++){
-        if (lf_push(&lf1, s->entries[i]) == -1) goto error;
+    for (i = 0; i < st->nb_entries; i++){
+        if (lf_push(&lf1, st->entries[i]) == -1) goto error;
     }
     while (1){
 
-        n = lf_pop(&lf1);
-        if (n == NULL){
+        nd = lf_pop(&lf1);
+        if (nd == NULL){
             if (errno == ENOENT) break;
             goto error;
         }
 
         /* Skip if already DOOMED  */ 
-        if (n->status == DOOMED) continue;
+        if (nd->status == DOOMED) continue;
 
         /* Set doomed if not doomed */
-        if (lf_push(&lf2, n) == -1) goto error;
-        n->status = DOOMED;
+        if (lf_push(&lf2, nd) == -1) goto error;
+        nd->status = DOOMED;
         
         /* Collect not neighbours */
-        for (i = 0; i < n->nb_neigh; i++){
-            if (lf_push(&lf1, n->neigh[i].n) == -1) goto error;
+        for (i = 0; i < nd->nb_neigh; i++){
+            if (lf_push(&lf1, nd->neigh[i].n) == -1) goto error;
         } 
     }
 
     /* Destroy collected nodes */
-    while ((n = lf_pop(&lf2))){
-        if (st_ndestroy(n) == -1) goto error;
+    while ((nd = lf_pop(&lf2))){
+        if (st_ndestroy(nd) == -1) goto error;
     }
     if (errno != ENOENT) goto error;
 
     /* Free straph */
-    free(s->entries);
-    free(s);
+    free(st->entries);
+    free(st);
     
     return 0;
 
@@ -691,15 +726,27 @@ error:
 }
 
 
-int st_start(straph s){
+
+
+/**
+ * @brief launch each node of a straph
+ *
+ * Activate the nodes of a straph following their
+ * topological order 
+ *
+ * @param st straph to launch
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
+int st_start(straph st){
 
     unsigned int i;
     struct linked_fifo lf;
     lf_init(&lf);
 
     /* Init fifo with straph's entries */
-    for (i = 0; i < s->nb_entries; i++){
-        if (lf_push(&lf, s->entries[i]) == -1){
+    for (i = 0; i < st->nb_entries; i++){
+        if (lf_push(&lf, st->entries[i]) == -1){
             lf_drop(&lf);
             return -1;
         }
@@ -712,8 +759,3 @@ int st_start(straph s){
 
     return 0;
 }
-
-
-
-
-
