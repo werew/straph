@@ -265,6 +265,8 @@ int st_setbuffer(node n, unsigned int idx_buf, unsigned char buftype, size_t buf
 int st_nlink(node a, node b, unsigned char mode);
 int st_addflow(node a, unsigned int idx_buf, node b, unsigned int islot);
 int st_bufstat(node n, unsigned int slot, int status);
+int st_nrewind(node n);
+int st_rewind(straph st);
 
 
 /* Straph's internals */

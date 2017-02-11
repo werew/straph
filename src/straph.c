@@ -586,8 +586,7 @@ int st_join(straph st){
             goto error;
         }
 
-        /* Once joined return inactive */
-        nd->status = INACTIVE; /* TODO do it in st_rewind */
+        st_nrewind(nd);
 
         /* Collect neighbours */
         for (i = 0; i < nd->nb_neigh; i++){
@@ -606,7 +605,62 @@ error:
     return -1;
 }
 
+int st_rewind(straph st){
 
+    unsigned int i;
+    struct linked_fifo lf;
+    node nd;
+
+    lf_init(&lf);
+
+    /* Init fifo with straph's entries */
+    for (i = 0; i < st->nb_entries; i++){
+        if (lf_push(&lf, st->entries[i]) == -1){
+            lf_drop(&lf);
+            return -1;
+        }
+    }
+
+    while (1){
+        /* Pop next node */
+        if ((nd = lf_pop(&lf)) == NULL){
+            if (errno == ENOENT) break;
+            return -1;
+        }
+
+        /* Launch node */ 
+        if (st_nrewind(nd) == -1){
+            lf_drop(&lf);
+            return -1;
+        }
+        /* Collect node's neighbours */
+        for (i = 0; i < nd->nb_neigh; i++){
+            if (lf_push(&lf, nd->neigh[i].n) == -1){
+                return -1;
+            }
+        } 
+    }
+
+    return 0;
+}
+
+
+
+
+int st_nrewind(node nd){
+    unsigned int i;
+
+    nd->status = INACTIVE;
+
+    /* Deactivate out buffers */
+    for (i = 0; i < nd->nb_outslots; i++){
+        st_bufstat(nd,i, BUF_READY);
+    }
+
+    nd->nb_startrequests = 0;
+
+    return 0;
+}
 
 
 /**
