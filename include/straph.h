@@ -31,14 +31,18 @@ typedef struct rw_slock {
 /**************** Node's output buffers ******************/
 
 /* Buffer types */
-#define NO_BUF   0 
-#define CIR_BUF  1 
-#define LIN_BUF  2
+#define NO_BUF   0 /* Empty slot      */
+#define CIR_BUF  1 /* Circular buffer */
+#define LIN_BUF  2 /* Linear buffer   */
 
 /* Buffer status */
-#define BUF_READY    0
-#define BUF_ACTIVE   1
-#define BUF_INACTIVE 2
+#define BUF_READY    0 /* Buf ready to be used:
+                          just created or rewinded  */
+#define BUF_ACTIVE   1 /* Buf receiving data:
+                          node is executing */
+#define BUF_INACTIVE 2 /* Not receiving anymore but it
+                          still possible to read: node
+                          has just terminated its execution */
 
 /**
  * Out buffer container
