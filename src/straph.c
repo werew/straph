@@ -633,7 +633,7 @@ int st_join(straph st){
         } 
     }
 
-    st_rewind(st);
+    if (st_rewind(st) == -1) return -1;
 
     return 0;
 
