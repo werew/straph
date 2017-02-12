@@ -595,9 +595,6 @@ int st_join(straph st){
         } 
     }
 
-    /*TODO st_rewind (set BUF_READY, status INACTIVE,
-      nb_startrequests, and other stuffs) */
-
     return 0;
 
 error:
@@ -605,6 +602,21 @@ error:
     return -1;
 }
 
+
+
+
+
+/**
+ * @brief rewind a straph to the status previous to 
+ *        its execution
+ *      
+ * This function shall be used to reset a straph after
+ * its execution in order to be able to use it again
+ *
+ * @param st the straph to rewind
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
 int st_rewind(straph st){
 
     unsigned int i;
@@ -647,6 +659,16 @@ int st_rewind(straph st){
 
 
 
+
+/**
+ * @brief rewind a node to its inactive status
+ *
+ * Reset a node to the status previous to its execution
+ *
+ * @param nd node to rewind
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
 int st_nrewind(node nd){
     unsigned int i;
 
@@ -661,6 +683,9 @@ int st_nrewind(node nd){
 
     return 0;
 }
+
+
+
 
 
 /**
