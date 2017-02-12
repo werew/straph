@@ -688,6 +688,7 @@ int st_rewind(straph st){
 
         /* Collect node's neighbours */
         for (i = 0; i < nd->nb_neigh; i++){
+            if (nd->neigh[i].n->status == INACTIVE) continue;
             if (lf_push(&lf, nd->neigh[i].n) == -1){
                 return -1;
             }
