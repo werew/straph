@@ -624,14 +624,16 @@ int st_join(straph st){
             goto error;
         }
 
-        st_nrewind(nd);
+        nd->status = JOINED;
 
         /* Collect neighbours */
         for (i = 0; i < nd->nb_neigh; i++){
-            if (nd->neigh[i].n->status == INACTIVE) continue;
+            if (nd->neigh[i].n->status == JOINED) continue;
             if (lf_push(&lf, nd->neigh[i].n) == -1) goto error;
         } 
     }
+
+    st_rewind(st);
 
     return 0;
 
@@ -683,6 +685,7 @@ int st_rewind(straph st){
             lf_drop(&lf);
             return -1;
         }
+
         /* Collect node's neighbours */
         for (i = 0; i < nd->nb_neigh; i++){
             if (lf_push(&lf, nd->neigh[i].n) == -1){

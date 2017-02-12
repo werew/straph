@@ -168,23 +168,31 @@ struct neighbour {
  *   | INACTIVE |<---+
  *   +----+-----+    |
  *        |          |
- *   st_start   | 
+ *     st_nup        | 
  *        |          |
  *   +----v-----+    |
- *   |  ACTIVE  |    | st_join
+ *   |  ACTIVE  |    | 
  *   +----+-----+    |
  *        |          |
- *  thread returns   |
+ *     st_ndown      | st_nrewind
  *        |          |
  *   +----v-----+    |
- *   |TERMINATED+----+
+ *   |TERMINATED+    |
+ *   +----------+    |
+ *        |          |
+ *     st_join       |
+ *        |          |
+ *   +----v-----+    |
+ *   |  JOINED  +----+
  *   +----------+
  *
  */
+
 #define INACTIVE   0
 #define ACTIVE     1
 #define TERMINATED 2
-#define DOOMED     3
+#define JOINED     3
+#define DOOMED     4
 
 /**
  * Main structure representing node
@@ -287,6 +295,7 @@ ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
 void* st_makeb(unsigned char buftype, size_t bufsize);
 void st_ndown(node nd);
 int st_nup(node nd);
+int st_starter(struct linked_fifo *lf);
 
 
 #endif
