@@ -286,6 +286,42 @@ int st_addflow(node a, unsigned int outslot,
 
 
 /**
+ * @brief launch each node of a straph
+ *
+ * Activate the nodes of a straph following their
+ * topological order 
+ *
+ * @param st straph to launch
+ * @return 0 in case of success or -1 otherwise, in this
+ *         case errno is set
+ */
+int st_start(straph st){
+
+    unsigned int i;
+    struct linked_fifo lf;
+    lf_init(&lf);
+
+    /* Init fifo with straph's entries */
+    for (i = 0; i < st->nb_entries; i++){
+        if (lf_push(&lf, st->entries[i]) == -1){
+            lf_drop(&lf);
+            return -1;
+        }
+    }
+
+    if (st_starter(&lf) == -1){
+        lf_drop(&lf);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+
+
+
+/**
  * @brief Launches all the nodes of an initialized fifo and
  *        their children
  * 
@@ -338,44 +374,59 @@ int st_starter(struct linked_fifo *lf){
 
 
 /**
- * @brief bring down a node to the status terminated
+ * @brief send a start request to an inactive node
  *
- * This function shall be called on a node after it's 
- * routine has terminated to change it's status to 
- * TERMINATED and free the data structures not longer
- * needed.
+ * Try to launch an inactive node by sending a start request. 
+ * If the number of start requests is equal or greater than
+ * the number of its parents, the node will be launched.
  *
- * @param nd the node to bring down
+ * @param nd node to which send a start request
+ * @return -1 in case of error, otherwise 1 if the
+ *          node has been launched or 0 if the node
+ *          is not ready (not enough start requests)
+ *          to be launched
  */
-void st_ndown(node nd){
+int st_nstart(node nd){
 
-    unsigned int i;
+    int err, ret;
+    /* Lock the node */
+    if ((err = pthread_spin_lock(&nd->launch_lock)) != 0) {
+        errno = err;
+        return -1;
+    }
 
-    /* Update status */
-    nd->status = TERMINATED;
+    /* Can launch only inactives nodes */
+    if (nd->status != INACTIVE ) {
+        errno = EINVAL;
+        pthread_spin_unlock(&nd->launch_lock);
+        return -1;
+    }
+        
+    /* Add start request */
+    nd->nb_startrequests += 1; 
+    if (nd->nb_startrequests < nd->nb_parents){
+        /* The node needs to wait for other parents */
+        ret = 0;
 
-    /* Free input slots */
-    for (i = 0; i < nd->nb_inslots; i++){
+    } else {
+        /* The node is ready to be launched */
 
-        struct inslot_c *inslot;
-        struct out_buf *src;
-
-        inslot = nd->inslots[i];
-        if (inslot == NULL) continue;
-
-        src = inslot->src;         
-        if (src->type == CIR_BUF) {
-            free(inslot->cache2);
+        /* Bring node up */
+        if (st_nup(nd) == -1){
+            pthread_spin_unlock(&nd->launch_lock);
+            return -1;
         }
-        free(inslot);
 
-        nd->inslots[i] = src;   /* Restore src */
+        ret = 1;
     }
 
-    /* Deactivate out buffers */
-    for (i = 0; i < nd->nb_outslots; i++){
-        st_bufstat(nd,i, BUF_INACTIVE);
+    /* Leave */
+    if ((err = pthread_spin_unlock(&nd->launch_lock)) != 0) {
+        errno = err;
+        return -1;
     }
+
+    return ret;
 }
 
 
@@ -419,6 +470,7 @@ void* st_threadwrapper(void *n){
 
     return ret;
 }
+
 
 
 
@@ -484,60 +536,46 @@ int st_nup(node nd){
 
 
 /**
- * @brief send a start request to an inactive node
+ * @brief bring down a node to the status terminated
  *
- * Try to launch an inactive node by sending a start request. 
- * If the number of start requests is equal or greater than
- * the number of its parents, the node will be launched.
+ * This function shall be called on a node after it's 
+ * routine has terminated to change it's status to 
+ * TERMINATED and free the data structures not longer
+ * needed.
  *
- * @param nd node to which send a start request
- * @return -1 in case of error, otherwise 1 if the
- *          node has been launched or 0 if the node
- *          is not ready (not enough start requests)
- *          to be launched
+ * @param nd the node to bring down
  */
-int st_nstart(node nd){
+void st_ndown(node nd){
 
-    int err, ret;
-    /* Lock the node */
-    if ((err = pthread_spin_lock(&nd->launch_lock)) != 0) {
-        errno = err;
-        return -1;
-    }
+    unsigned int i;
 
-    /* Can launch only inactives nodes */
-    if (nd->status != INACTIVE ) {
-        errno = EINVAL;
-        pthread_spin_unlock(&nd->launch_lock);
-        return -1;
-    }
-        
-    /* Add start request */
-    nd->nb_startrequests += 1; 
-    if (nd->nb_startrequests < nd->nb_parents){
-        /* The node needs to wait for other parents */
-        ret = 0;
+    /* Update status */
+    nd->status = TERMINATED;
 
-    } else {
-        /* The node is ready to be launched */
+    /* Free input slots */
+    for (i = 0; i < nd->nb_inslots; i++){
 
-        /* Bring node up */
-        if (st_nup(nd) == -1){
-            pthread_spin_unlock(&nd->launch_lock);
-            return -1;
+        struct inslot_c *inslot;
+        struct out_buf *src;
+
+        inslot = nd->inslots[i];
+        if (inslot == NULL) continue;
+
+        src = inslot->src;         
+        if (src->type == CIR_BUF) {
+            free(inslot->cache2);
         }
+        free(inslot);
 
-        ret = 1;
+        nd->inslots[i] = src;   /* Restore src */
     }
 
-    /* Leave */
-    if ((err = pthread_spin_unlock(&nd->launch_lock)) != 0) {
-        errno = err;
-        return -1;
+    /* Deactivate out buffers */
+    for (i = 0; i < nd->nb_outslots; i++){
+        st_bufstat(nd,i, BUF_INACTIVE);
     }
-
-    return ret;
 }
+
 
 
 
@@ -689,56 +727,6 @@ int st_nrewind(node nd){
 
 
 /**
- * @brief destroy/free a node
- * 
- * Destroy a node by freeing all the data structures
- * associated to that node
- *
- * @param nd the node to destroy
- * @return 0 in case of success or -1 otherwise, in this
- *         case errno is set
- */
-int st_ndestroy(node nd){
-    int err;
-    unsigned int i;
-
-    /* Destroy out bufs */
-    if (nd->outslots != NULL){
-        for (i = 0; i < nd->nb_outslots; i++){
-        
-            if (nd->outslots[i].buf == NULL) continue;
-
-            switch (nd->outslots[i].type){
-                case LIN_BUF: st_destroylb(nd->outslots[i].buf);
-                    break;
-                case CIR_BUF: st_destroycb(nd->outslots[i].buf);
-                    break;
-                default: errno = EINVAL;
-                         return -1;  
-            }
-        }
-
-        free(nd->outslots);
-    }
-
-    free(nd->inslots);
-    free(nd->neigh);
-
-    err = pthread_spin_destroy(&nd->launch_lock);
-    if (err != 0){
-        errno = err;
-        return -1;
-    }
-
-    free(nd);
-
-    return 0;
-}
-
-
-
-
-/**
  * @brief free a straph and all its nodes
  * 
  * Free all data structures associated to a straph.
@@ -807,34 +795,50 @@ error:
 
 
 
+
 /**
- * @brief launch each node of a straph
+ * @brief destroy/free a node
+ * 
+ * Destroy a node by freeing all the data structures
+ * associated to that node
  *
- * Activate the nodes of a straph following their
- * topological order 
- *
- * @param st straph to launch
+ * @param nd the node to destroy
  * @return 0 in case of success or -1 otherwise, in this
  *         case errno is set
  */
-int st_start(straph st){
-
+int st_ndestroy(node nd){
+    int err;
     unsigned int i;
-    struct linked_fifo lf;
-    lf_init(&lf);
 
-    /* Init fifo with straph's entries */
-    for (i = 0; i < st->nb_entries; i++){
-        if (lf_push(&lf, st->entries[i]) == -1){
-            lf_drop(&lf);
-            return -1;
+    /* Destroy out bufs */
+    if (nd->outslots != NULL){
+        for (i = 0; i < nd->nb_outslots; i++){
+        
+            if (nd->outslots[i].buf == NULL) continue;
+
+            switch (nd->outslots[i].type){
+                case LIN_BUF: st_destroylb(nd->outslots[i].buf);
+                    break;
+                case CIR_BUF: st_destroycb(nd->outslots[i].buf);
+                    break;
+                default: errno = EINVAL;
+                         return -1;  
+            }
         }
+
+        free(nd->outslots);
     }
 
-    if (st_starter(&lf) == -1){
-        lf_drop(&lf);
+    free(nd->inslots);
+    free(nd->neigh);
+
+    err = pthread_spin_destroy(&nd->launch_lock);
+    if (err != 0){
+        errno = err;
         return -1;
     }
+
+    free(nd);
 
     return 0;
 }
