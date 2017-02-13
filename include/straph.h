@@ -2,6 +2,7 @@
 #define _TYPES_H_
 
 #include <stddef.h>
+#include <stdint.h>
 #include <pthread.h>
 
 
@@ -78,7 +79,7 @@ struct l_buf {
  * and read capability. At every write the data
  * is incorporated inside one or more chunks. 
  * Each chunk is so composed:
- *          1 byte      1 byte      n bytes
+ *          2 byte      2 byte      n bytes
  *      +------------+-----------+------------+
  *      | read count | size data | data ...   |
  *      +------------+-----------+------------+
@@ -97,6 +98,28 @@ struct c_buf {
     unsigned int nb_readers;          /* Number of readers actives */
 };
 
+
+
+typedef uint16_t cbcnt_t;
+typedef uint16_t cbsz_t ;
+#define SIZE_CKHEAD (sizeof(cbcnt_t)+sizeof(cbsize_t))
+
+struct cb_chunk {
+    cbcnt_t count;
+    cbsz_t  size;
+    char*    data;
+};
+
+
+
+#define CB_CKCNT(b,o) (*(cbcnt_t*) &b->buf[o % b->sizebuf])
+#define CB_CKSZ(b,o)  (*(cbsz_t*) &b->buf[(o + sizeof(cbcnt_t)) % b->sizebuf])
+#define CB_CKDT(b,o)  (&b->buf[ (o + SIZE_CKHEAD) % b->sizebuf])
+
+#define CB_CK(b,o) { CB_CKCOUNT(b,o),  \
+                      CB_CKSIZE(b,o),  \
+                      CB_CKDATA(b,o)   \
+                   }
 
 
 
@@ -126,15 +149,17 @@ struct inslot_l {
 #define SIZE_CACHE1 128
 struct inslot_c {
     struct out_buf* src;      /* Source buffer */
+    unsigned int of_nextck;   /* Next unread chunk */
 
+    /* Cache 1 */
     char cache1[SIZE_CACHE1]; /* Circular buffer. Each read must 
                                  consume all the readable data storing
                                  it if necessary in this cache */
-
     unsigned int of_start;    /* Offset to the unread data (cache1) */
     unsigned int of_end;      /* Offset to the end of the unread 
                                  data (cache1) */
 
+    /* Cache 2 */
     char* cache2;             /* Dynamic size cache to use only when 
                                  cache1 is full */
     unsigned int of_start2;   /* Offset to the unread data */
