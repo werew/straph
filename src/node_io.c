@@ -7,6 +7,38 @@
 #include "straph.h"
 
 
+#define unused(x) ((void)x)
+
+ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
+    int err; 
+    unsigned int start;  
+    cksize_t size_lastck;
+    size_t av_space;
+
+    /* XXX suppress compiler warnings */
+    unused(buf);
+    unused(err);
+    unused(nbyte);
+    unused(av_space);
+
+
+    /* Calculate start point */
+    size_lastck = CB_CKSIZE(cb, cb->of_lastck);
+    if (size_lastck == 0){
+        start = cb->of_lastck;        
+    } else {
+        start = cb->of_lastck + SIZE_CKHEAD + size_lastck;
+    }
+
+    /* Get available space */
+    av_space = ( cb->of_firstck <= start ) ?
+               cb->sizebuf - (start - cb->of_firstck) :
+               cb->of_firstck - start;
+
+    return 0;
+}
+
+
 ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte){
 
     int err;
