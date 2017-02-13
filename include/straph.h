@@ -100,20 +100,20 @@ struct c_buf {
 
 
 
-typedef uint16_t cbcnt_t;
-typedef uint16_t cbsz_t ;
-#define SIZE_CKHEAD (sizeof(cbcnt_t)+sizeof(cbsize_t))
+typedef uint16_t cbcount_t;
+typedef uint16_t cbsize_t ;
+#define SIZE_CKHEAD (sizeof(cbcount_t)+sizeof(cbsize_t))
 
 struct cb_chunk {
-    cbcnt_t count;
-    cbsz_t  size;
+    cbcount_t count;
+    cbsize_t  size;
     char*    data;
 };
 
 
 
-#define CB_CKCOUNT(b,o) (*(cbcnt_t*) &b->buf[o % b->sizebuf])
-#define CB_CKSIZE(b,o)  (*(cbsz_t*) &b->buf[(o + sizeof(cbcnt_t)) % b->sizebuf])
+#define CB_CKCOUNT(b,o) (*(cbcount_t*) &b->buf[o % b->sizebuf])
+#define CB_CKSIZE(b,o)  (*(cbsize_t*) &b->buf[(o + sizeof(cbcount_t)) % b->sizebuf])
 #define CB_CKDATA(b,o)  (&b->buf[ (o + SIZE_CKHEAD) % b->sizebuf])
 
 #define CB_CK(b,o) { CB_CKCOUNT(b,o),  \
