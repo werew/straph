@@ -112,9 +112,9 @@ struct cb_chunk {
 
 
 
-#define CB_CKCNT(b,o) (*(cbcnt_t*) &b->buf[o % b->sizebuf])
-#define CB_CKSZ(b,o)  (*(cbsz_t*) &b->buf[(o + sizeof(cbcnt_t)) % b->sizebuf])
-#define CB_CKDT(b,o)  (&b->buf[ (o + SIZE_CKHEAD) % b->sizebuf])
+#define CB_CKCOUNT(b,o) (*(cbcnt_t*) &b->buf[o % b->sizebuf])
+#define CB_CKSIZE(b,o)  (*(cbsz_t*) &b->buf[(o + sizeof(cbcnt_t)) % b->sizebuf])
+#define CB_CKDATA(b,o)  (&b->buf[ (o + SIZE_CKHEAD) % b->sizebuf])
 
 #define CB_CK(b,o) { CB_CKCOUNT(b,o),  \
                       CB_CKSIZE(b,o),  \
