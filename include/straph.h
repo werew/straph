@@ -108,12 +108,36 @@ typedef uint16_t cksize_t ;
 struct cb_chunk {
     ckcount_t count;
     cksize_t  size;
-    char*    data;
+    char*    data; // TODO char*  vs char[]
 };
 
 
+
+#define CB_READUI16(b,o,a) { ((unsigned char*) a)[0] = b->buf[(o) % b->sizebuf];       \
+                             ((unsigned char*) a)[1] = b->buf[((o)+1) % b->sizebuf];   \
+                           }
+
+#define CB_WRITEUI16(b,o,a) { b->buf[(o) % b->sizebuf] = ((unsigned char*) a)[0];      \
+                              b->buf[((o)+1) % b->sizebuf] = ((unsigned char*) a)[1];  \
+                            }
 /* TODO: manage not contiguos header's bytes */
+/*
+
+inline cksize_t cb_getcksize(struct c_buf *cb){
+}
+
+inline ckcount_t cb_getckcount(struct c_buf *cb){
+}
+
+inline struct cb_chunk* cb_getck(struct c_buf *cb){
+}
+
+*/
+
+/* XXX old */
 #define CB_CKCOUNT(b,o) (*(ckcount_t*) &b->buf[o % b->sizebuf])
+
+
 #define CB_CKSIZE(b,o)  (*(cksize_t*) &b->buf[(o + sizeof(ckcount_t)) % b->sizebuf])
 #define CB_CKDATA(b,o)  (&b->buf[ (o + SIZE_CKHEAD) % b->sizebuf])
 
