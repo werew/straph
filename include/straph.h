@@ -103,6 +103,7 @@ struct c_buf {
 typedef uint16_t ckcount_t;
 typedef uint16_t cksize_t ;
 #define SIZE_CKHEAD (sizeof(ckcount_t)+sizeof(cksize_t))
+/* TODO define MAX_CKSIZE */
 
 struct cb_chunk {
     ckcount_t count;
@@ -111,7 +112,7 @@ struct cb_chunk {
 };
 
 
-
+/* TODO: manage not contiguos header's bytes */
 #define CB_CKCOUNT(b,o) (*(ckcount_t*) &b->buf[o % b->sizebuf])
 #define CB_CKSIZE(b,o)  (*(cksize_t*) &b->buf[(o + sizeof(ckcount_t)) % b->sizebuf])
 #define CB_CKDATA(b,o)  (&b->buf[ (o + SIZE_CKHEAD) % b->sizebuf])
