@@ -103,7 +103,8 @@ struct c_buf {
 typedef uint16_t ckcount_t;
 typedef uint16_t cksize_t ;
 #define SIZE_CKHEAD (sizeof(ckcount_t)+sizeof(cksize_t))
-/* TODO define MAX_CKSIZE */
+#define MAX_CKSIZE 0xffff /* Max uint16_t */
+
 
 struct cb_chunk {
     ckcount_t count;
