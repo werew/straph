@@ -100,20 +100,6 @@ struct c_buf {
 
 
 
-typedef uint16_t ckcount_t;
-typedef uint16_t cksize_t ;
-#define SIZE_CKHEAD (sizeof(ckcount_t)+sizeof(cksize_t))
-#define MAX_CKSIZE 0xffff /* Max uint16_t */
-
-
-struct cb_chunk {
-    ckcount_t count;
-    cksize_t  size;
-    char*    data; /* TODO char*  vs char[] */
-};
-
-
-
 #define CB_READUI16(b,o,a) { ((unsigned char*) a)[0] = b->buf[(o) % b->sizebuf];       \
                              ((unsigned char*) a)[1] = b->buf[((o)+1) % b->sizebuf];   \
                            }
@@ -121,6 +107,20 @@ struct cb_chunk {
 #define CB_WRITEUI16(b,o,a) { b->buf[(o) % b->sizebuf] = ((unsigned char*) a)[0];      \
                               b->buf[((o)+1) % b->sizebuf] = ((unsigned char*) a)[1];  \
                             }
+
+typedef uint16_t ckcount_t;
+typedef uint16_t cksize_t ;
+#define SIZE_CKHEAD (sizeof(ckcount_t)+sizeof(cksize_t))
+#define MAX_CKSIZE 0xffff /* Max uint16_t */
+
+/* Header of a chunk */
+struct cb_ckhead{
+    ckcount_t count; /* Number of reads  */
+    cksize_t  size;  /* Size of the data */
+};
+
+
+
 
 
 
