@@ -7,8 +7,22 @@
 #include "straph.h"
 
 
-#define unused(x) ((void)x)
 
+inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck){
+    ckcount_t s;
+    CB_READUI16(cb,of_ck,&s);
+    return s;
+}
+
+
+inline cksize_t cb_getcksize(struct c_buf *cb, unsigned int of_ck){
+    cksize_t s;
+    CB_READUI16(cb,of_ck+2,&s);
+    return s;
+}
+
+
+#define unused(x) ((void)x)
 ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
     int err; 
     unsigned int start;  
@@ -23,7 +37,7 @@ ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
 
 
     /* Calculate start point */
-    size_lastck = CB_CKSIZE(cb, cb->of_lastck);
+    size_lastck = cb_getcksize(cb,cb->of_lastck);
     if (size_lastck == 0){
         start = cb->of_lastck;        
     } else {

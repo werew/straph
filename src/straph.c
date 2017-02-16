@@ -592,6 +592,7 @@ void st_ndown(node nd){
  * @param st running straph to join
  * @return 0 in case of success or -1 otherwise, in this
  *         case errno is set
+ * TODO wait execution before join
  */
 int st_join(straph st){
     node nd;
