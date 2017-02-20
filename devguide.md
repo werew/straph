@@ -45,8 +45,12 @@ Breaking a line:
 this_is_a(very, very, very long function, call, when
     I go to a new line I just add one more identation);
 
+
+declare variables at the beginning of the closest scope
 Vocabulary:
     execution-edge
     io-edge
     execution flow
     data flow
+
+
