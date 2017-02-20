@@ -90,12 +90,18 @@ struct l_buf {
 struct c_buf {
     char* buf;                  /* Pointer to the buf */
     unsigned int sizebuf;       /* Size of the buf */
-    unsigned int of_firstck;    /* Offset to the first used chunk */
-    unsigned int of_lastck;     /* Offset to the last used chunk  */
+    unsigned int data_start;   
+    unsigned int data_size;     
 
-    pthread_mutex_t access_lock;      /* Mutex for buffer access */
-    pthread_mutex_t nb_readers_mutex; /* Mutex for read access */
-    unsigned int nb_readers;          /* Number of readers actives */
+    pthread_mutex_t lock_ckcount;    /* Concurrent reads/writes of the 
+                                        count header of the chunks */
+    pthread_cond_t  cond_free;
+
+    pthread_mutex_t lock_refs;       /* Concurrent reads/writes of
+                                        data_start and data_size   */
+    pthread_cond_t  cond_acquire;
+
+    unsigned int nreaders;          /* Number of readers actives */
 };
 
 
@@ -111,7 +117,8 @@ struct c_buf {
 typedef uint16_t ckcount_t;
 typedef uint16_t cksize_t ;
 #define SIZE_CKHEAD (sizeof(ckcount_t)+sizeof(cksize_t))
-#define MAX_CKSIZE 0xffff /* Max uint16_t */
+#define MAX_CKDATASIZE 0xffff /* Max uint16_t */
+#define MAX_CKSIZE  (SIZE_CKHEAD + MAX_CKDATASIZE)
 
 /* Header of a chunk */
 struct cb_ckhead{
