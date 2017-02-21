@@ -57,8 +57,11 @@ inline void cb_writechunk
 ssize_t cb_genfreespace(struct c_buf *cb, bool blocking){
     int err;
     ssize_t freedsize;
-   
-    freedsize = 0;
+    size_t of_ck, end;
+  
+    freedsize = 0; 
+    of_ck = cb->data_start;
+    end   = (cb->data_start+cb->data_size) % cb->sizebuf;
 
     if ((err = pthread_mutex_lock(&cb->lock_ckcount)) != 0){
         errno = err;
@@ -68,16 +71,22 @@ ssize_t cb_genfreespace(struct c_buf *cb, bool blocking){
     while (1){
 
         while (1){
-            /* TODO do not change directly cb->data_start */
             ckcount_t ckcount;
             cksize_t cksize;
 
-            CB_READUI16(cb,cb->data_start,&ckcount);
+            /* Check ck read count */
+            CB_READUI16(cb,of_ck,&ckcount);
             if (ckcount < cb->nreaders) break;
 
-            CB_READUI16(cb,cb->data_start+sizeof(ckcount_t),&cksize);
-            cb->data_start = (cb->data_start+SIZE_CKHEAD+cksize) % cb->sizebuf;
+            /* Consider the total size of the ck as free */ 
             freedsize += SIZE_CKHEAD + cksize;
+
+            /* Move to next ck */
+            CB_READUI16(cb,of_ck+sizeof(ckcount_t),&cksize);
+            of_ck = (of_ck + SIZE_CKHEAD+cksize) % cb->sizebuf;
+            
+            /* Stop, ck finished */
+            if (of_ck == end) break; 
         }
 
         if ( blocking == false || freedsize != 0) break;
