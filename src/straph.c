@@ -257,12 +257,10 @@ int st_addflow(node a, unsigned int outslot,
     /* 
      TODO: 
         - increment the count on the buffer
-        - decrement the count of the previous buffer
-          if the slot was already used
     */
 
-    /* Add a new input slot to 'b' */
     if (b->nb_inslots <= inslot){
+        /* Add a new input slot to 'b' */
 
         /* Realloc if inslot is beyond the capacity */
         void *tmp = realloc(b->inslots, (inslot+1)*sizeof(void*));
@@ -274,9 +272,17 @@ int st_addflow(node a, unsigned int outslot,
 
         b->inslots = tmp;
         b->nb_inslots = inslot+1;
+
+    } else if (b->inslots[inslot] != NULL){
+        /*
+          Decrement the count of the previous buffer
+          if the slot was already used
+        */
+        ((struct out_buf*) b->inslots[inslot])->nreaders--;
     }
 
     b->inslots[inslot] = &a->outslots[outslot];
+    a->outslots[outslot].nreaders++;
 
     return 0;
 }
