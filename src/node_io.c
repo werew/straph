@@ -54,7 +54,8 @@ inline void cb_writechunk
 }
 
 
-ssize_t cb_genfreespace(struct c_buf *cb, bool blocking){
+ssize_t cb_genfreespace
+(struct c_buf *cb, ckcount_t maxreads, bool blocking){
     int err;
     ssize_t freedsize;
     size_t of_ck, end;
@@ -76,7 +77,7 @@ ssize_t cb_genfreespace(struct c_buf *cb, bool blocking){
 
             /* Check ck read count */
             CB_READUI16(cb,of_ck,&ckcount);
-            if (ckcount < cb->nreaders) break;
+            if (ckcount < maxreads) break;
 
             /* Consider the total size of the ck as free */ 
             freedsize += SIZE_CKHEAD + cksize;
@@ -181,7 +182,17 @@ size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nby
     return (of_start+size_written-size_chunk) % cb->sizebuf; 
 }
 
-ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
+
+
+
+
+
+
+ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
+
+    /* Circular buffer */
+    struct c_buf *cb = ob->buf;
+
     unsigned int of_start;
     size_t total_freespace, real_freespace;
     ssize_t new_freespace;
@@ -202,7 +213,8 @@ ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
        
         /* If there isn't free space at all it's ok to wait */
         bool blocking = (real_freespace == 0);
-        if ((new_freespace = cb_genfreespace(cb,blocking)) == -1) return -1;
+        if ((new_freespace = cb_genfreespace
+                (cb,ob->nreaders, blocking)) == -1) return -1;
 
         /* Update values if new space is available */
         if (new_freespace > 0){
@@ -232,7 +244,8 @@ ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
         if (cb_acquire(cb, space_used) == -1) return -1; 
 
         /* Free more data, waiting if necessary */
-        if ((new_freespace = cb_genfreespace(cb,true)) == -1 ||
+        if ((new_freespace = cb_genfreespace
+                (cb,ob->nreaders, true)) == -1  ||
              cb_release(cb, new_freespace) == -1 ) return -1;
 
         /* Update free space count */
@@ -251,7 +264,10 @@ ssize_t st_cbwrite(struct c_buf *cb, const void *buf, size_t nbyte){
 
 
 
-ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte){
+ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte){
+
+    /* Linear buffer */
+    struct l_buf *lb = ob->buf;
 
     int err;
     size_t space_available;
@@ -437,11 +453,11 @@ ssize_t st_write(node n, unsigned int slot,
 
     switch (n->outslots[slot].type){
         case LIN_BUF: 
-            return st_lbwrite(n->outslots[slot].buf,
-                            buf, nbyte);
+            return st_lbwrite(&n->outslots[slot],
+                       buf, nbyte);
         case CIR_BUF: 
-            return 0; /*write_cb(n->outslots[slot].buf,
-                       buf, nbyte); */
+            return st_cbwrite(&n->outslots[slot],
+                       buf, nbyte);
         default: 
             errno = EINVAL;
             return -1;
@@ -479,7 +495,7 @@ struct l_buf* st_makelb(size_t sizebuf){
 }
 
 
-
+/* TODO initialize */
 struct c_buf* st_makecb(size_t sizebuf){
     int err;
     struct c_buf* b;
@@ -515,7 +531,6 @@ struct c_buf* st_makecb(size_t sizebuf){
     b->sizebuf = sizebuf;
     b->data_start = 0;
     b->data_size = 0;
-    b->nreaders = 0;
 
     return b;
 }

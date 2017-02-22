@@ -51,6 +51,7 @@ typedef struct rw_slock {
 struct out_buf {
     unsigned char type;      /* Type of the buffer */
     void* buf;               /* Output buffer */
+    unsigned int nreaders;   /* Number of readers actives */
 };
 
 
@@ -101,7 +102,6 @@ struct c_buf {
                                         data_start and data_size   */
     pthread_cond_t  cond_acquire;
 
-    unsigned int nreaders;          /* Number of readers actives */
 };
 
 
@@ -320,7 +320,7 @@ struct inslot_l* st_makeinslotl(struct out_buf* b);
 struct inslot_l* st_makeinslotc(struct out_buf* b);
 int st_nstart(node n);
 void* st_threadwrapper(void* n);
-ssize_t st_lbwrite(struct l_buf* lb, const void* buf, size_t nbyte);
+ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte);
 int st_bufstatlb(struct l_buf* lb, int status);
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte);
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
