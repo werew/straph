@@ -134,6 +134,7 @@ struct cb_ckhead{
 
 /******************** Node's input slots *********************/
 
+
 /**
  * The input slots are used to perform and
  * track the reads of a node to an out buffer
@@ -141,7 +142,15 @@ struct cb_ckhead{
  * depends on the type of the buffer.
  *
  *
- *
+ * Generic input slot:
+ * contains the fields in common to each type
+ * of input slot
+ */
+struct inslot {
+    struct out_buf* src;      /* Source buffer */
+};
+
+/**
  * Linear input slot:
  * used to read from a struct l_buf
  */

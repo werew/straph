@@ -412,7 +412,6 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 
 
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
-    struct inslot_l* islot;
     struct out_buf* ob;
 
     if (n->nb_inslots <= slot        ||
@@ -421,9 +420,7 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
     }
 
     /* Get out buffer */
-    islot = n->inslots[slot];
-    ob = islot->src; 
-
+    ob = ((struct inslot*) n->inslots[slot])->src;
     if (ob == NULL) return 0;
 
     switch (ob->type){
