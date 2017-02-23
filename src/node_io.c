@@ -238,7 +238,7 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
 
         /* Stop writing if we wrote nbyte of data */
         size_written += size_write;
-        if (size_written < nbyte) break;
+        if (size_written >= nbyte) break;
 
         /* Update cb and notify new data */
         if (cb_acquire(cb, space_used) == -1) return -1; 
