@@ -179,7 +179,7 @@ size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nby
         size_written += size_chunk; 
     }
 
-    return (of_start+size_written-size_chunk) % cb->sizebuf; 
+    return size_written+SIZE_CKHEAD*(size_written+MAX_CKSIZE-1)/MAX_CKSIZE; 
 }
 
 
