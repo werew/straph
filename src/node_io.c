@@ -257,9 +257,53 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
 }
 
 
+/* Read as much as possible from the cache
+ * update the cache
+ * return the size read
+ */
+size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
+    size_t size2read, linear_size;
+    
+    /* Size that will be read from the cache */
+    size2read = MIN(in->size_cdata, nbyte);
+    
+    /* First contiguous read */
+    linear_size = MIN(SIZE_CACHE - in->of_cdata, size2read);
+    memcpy(buf, &in->cache[in->of_cdata], linear_size);
+
+    /* Update cache */
+    in->of_cdata = (in->of_cdata + linear_size) % SIZE_CACHE;
+
+    if (linear_size < size2read){
+        /* Second read on contiguous memory */
+        buf = (char*) buf + linear_size;
+        memcpy(buf, &in->cache[in->of_cdata], size2read-linear_size);
+        in->of_cdata = (in->of_cdata + linear_size) % SIZE_CACHE;
+    }
+
+    in->size_cdata -= size2read;
+    
+    return size2read;
+}
+
+ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
+
+    size_t size_read = 0;
+    /*struct c_buf *cb = in->src->buf; */  /* Circular buffer */
+    
+    /* Read from cache */
+    size_read += inc_cacheread(in,buf,nbyte);
+    if (size_read >= nbyte) return size_read; 
+
+    /* Read from buffer (nbyte-size_read) + SIZE_CACHE bytes */
+   
 
 
+    return 0; 
 
+     
+
+}
 
 
 
