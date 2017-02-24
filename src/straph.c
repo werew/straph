@@ -568,9 +568,6 @@ void st_ndown(node nd){
         if (inslot == NULL) continue;
 
         src = inslot->src;         
-        if (src->type == CIR_BUF) {
-            free(inslot->cache2);
-        }
         free(inslot);
 
         nd->inslots[i] = src;   /* Restore src */

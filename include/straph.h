@@ -163,24 +163,19 @@ struct inslot_l {
  * Circular input slot:
  * used to read from a struct c_buf
  */
-#define SIZE_CACHE1 128
+#define SIZE_CACHE 128
 struct inslot_c {
     struct out_buf* src;      /* Source buffer */
-    unsigned int of_nextck;   /* Next unread chunk */
+    unsigned int of_read;     /* Offset unread data */
+    unsigned int of_ck;       /* Offset current chunk */
 
-    /* Cache 1 */
-    char cache1[SIZE_CACHE1]; /* Circular buffer. Each read must 
+    /* Cache */
+    char cache[SIZE_CACHE];   /* Circular buffer. Each read must 
                                  consume all the readable data storing
                                  it if necessary in this cache */
-    unsigned int of_start;    /* Offset to the unread data (cache1) */
-    unsigned int of_end;      /* Offset to the end of the unread 
-                                 data (cache1) */
+    unsigned int of_cdata;    /* Offset to the unread data (cache1) */
+    unsigned int size_cdata;  /* Size of the unread data (cache1) */
 
-    /* Cache 2 */
-    char* cache2;             /* Dynamic size cache to use only when 
-                                 cache1 is full */
-    unsigned int of_start2;   /* Offset to the unread data */
-    unsigned int size_cache2; /* Size of the cache2 */
 
 };
 
