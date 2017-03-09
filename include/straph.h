@@ -290,12 +290,12 @@ void lf_drop(struct linked_fifo* lf);
 
 
 /* Read/Write locks */
-int rwlock_rlock(rwlock l);
-int rwlock_runlock(rwlock l);
-int rwlock_wlock(rwlock l);
-int rwlock_wunlock(rwlock l);
-int rwlock_init(rwlock* l);
-int rwlock_destroy(rwlock l);
+int rwlock_rlock(rwlock *l);
+int rwlock_runlock(rwlock *l);
+int rwlock_wlock(rwlock *l);
+int rwlock_wunlock(rwlock *l);
+int rwlock_init(rwlock *l);
+int rwlock_destroy(rwlock *l);
 
 
 /* Straph user's interface */
