@@ -5,26 +5,26 @@
 #include "straph.h"
 
 
-int rw_spinlock_rlock(rw_spinlock l){
+int rwlock_rlock(rwlock l){
     int err;
 
     /* Lock r */
-    if ((err = pthread_spin_lock(&l.r)) != 0){
+    if ((err = pthread_mutex_lock(&l.r)) != 0){
         errno = err;
         return -1;
     }
 
     /* Lock w if this is the first reader */
     if (++l.n_r == 1){
-        if ((err = pthread_spin_lock(&l.w)) != 0){
-            pthread_spin_unlock(&l.r);
+        if ((err = pthread_mutex_lock(&l.w)) != 0){
+            pthread_mutex_unlock(&l.r);
             errno = err;
             return -1;
         }
     }
 
     /* Unlock r */
-    if ((err = pthread_spin_unlock(&l.r)) != 0){
+    if ((err = pthread_mutex_unlock(&l.r)) != 0){
         errno = err;
         return -1;
     }
@@ -32,26 +32,26 @@ int rw_spinlock_rlock(rw_spinlock l){
     return 0;
 }
 
-int rw_spinlock_runlock(rw_spinlock l){
+int rwlock_runlock(rwlock l){
     int err;
 
     /* Lock r */
-    if ((err = pthread_spin_lock(&l.r)) != 0){
+    if ((err = pthread_mutex_lock(&l.r)) != 0){
         errno = err;
         return -1;
     }
 
     /* Unlock w if this is the last reader */
     if (--l.n_r == 0){
-        if ((err = pthread_spin_unlock(&l.w)) != 0){
-            pthread_spin_unlock(&l.r);
+        if ((err = pthread_mutex_unlock(&l.w)) != 0){
+            pthread_mutex_unlock(&l.r);
             errno = err;
             return -1;
         }
     }
 
     /* Unlock r */
-    if ((err = pthread_spin_unlock(&l.r)) != 0){
+    if ((err = pthread_mutex_unlock(&l.r)) != 0){
         errno = err;
         return -1;
     }
@@ -60,38 +60,38 @@ int rw_spinlock_runlock(rw_spinlock l){
 }
     
 
-int rw_spinlock_wlock(rw_spinlock l){
+int rwlock_wlock(rwlock l){
     /* Lock w */
     int err;
-    if ((err = pthread_spin_lock(&l.w)) != 0){
+    if ((err = pthread_mutex_lock(&l.w)) != 0){
         errno = err;
         return -1;
     }
     return 0;
 }
 
-int rw_spinlock_wunlock(rw_spinlock l){
+int rwlock_wunlock(rwlock l){
     /* Unlock w */
     int err;
-    if ((err = pthread_spin_unlock(&l.w)) != 0){
+    if ((err = pthread_mutex_unlock(&l.w)) != 0){
         errno = err;
         return -1;
     }
     return 0;
 }
     
-int rw_spinlock_init(rw_spinlock* l){
+int rwlock_init(rwlock* l){
 
     int err;
-    if ((err = pthread_spin_init(&l->r, 
+    if ((err = pthread_mutex_init(&l->r, 
                PTHREAD_PROCESS_PRIVATE)) != 0){
         errno = err;
         return -1;
     }
 
-    if ((err = pthread_spin_init(&l->w,
+    if ((err = pthread_mutex_init(&l->w,
                PTHREAD_PROCESS_PRIVATE)) != 0){
-        pthread_spin_destroy(&l->r);
+        pthread_mutex_destroy(&l->r);
         errno = err;
         return -1;
     }
@@ -101,11 +101,11 @@ int rw_spinlock_init(rw_spinlock* l){
     return 0;
 }
 
-int rw_spinlock_destroy(rw_spinlock l){
+int rwlock_destroy(rwlock l){
 
     int err;
-    if ((err = pthread_spin_destroy(&l.r)) != 0 ||
-        (err = pthread_spin_destroy(&l.w)) != 0 ){
+    if ((err = pthread_mutex_destroy(&l.r)) != 0 ||
+        (err = pthread_mutex_destroy(&l.w)) != 0 ){
         errno = err;
         return -1;
     }

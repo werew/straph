@@ -21,12 +21,12 @@ struct linked_fifo {
     struct lf_cell* last;  /* Most recent cell of the list  */
 };
 
-/* Spinlock-based readers-writer lock */
-typedef struct rw_slock {
-    unsigned int n_r;      /* Readers count */
-    pthread_spinlock_t r;  /* Lock for readers count */
-    pthread_spinlock_t w;  /* Writer lock */
-} rw_spinlock;
+/* Mutex-based readers-writer lock */
+typedef struct {
+    unsigned int n_r;   /* Readers count */
+    pthread_mutex_t r;  /* Lock for readers count */
+    pthread_mutex_t w;  /* Writer lock */
+} rwlock;
 
 
 /**************** Node's output buffers ******************/
@@ -290,12 +290,12 @@ void lf_drop(struct linked_fifo* lf);
 
 
 /* Read/Write locks */
-int rw_spinlock_rlock(rw_spinlock l);
-int rw_spinlock_runlock(rw_spinlock l);
-int rw_spinlock_wlock(rw_spinlock l);
-int rw_spinlock_wunlock(rw_spinlock l);
-int rw_spinlock_init(rw_spinlock* l);
-int rw_spinlock_destroy(rw_spinlock l);
+int rwlock_rlock(rwlock l);
+int rwlock_runlock(rwlock l);
+int rwlock_wlock(rwlock l);
+int rwlock_wunlock(rwlock l);
+int rwlock_init(rwlock* l);
+int rwlock_destroy(rwlock l);
 
 
 /* Straph user's interface */
