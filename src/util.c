@@ -113,6 +113,16 @@ int rwlock_destroy(rwlock *l){
     return 0;
 }
 
+int rwlock_cond_wait(pthread_cond_t *cond, rwlock *l){
+
+    int err;
+    if ((err = pthread_cond_wait(cond, &l->w)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    return 0;
+}
 
 
 

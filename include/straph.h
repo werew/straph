@@ -296,6 +296,7 @@ int rwlock_wlock(rwlock *l);
 int rwlock_wunlock(rwlock *l);
 int rwlock_init(rwlock *l);
 int rwlock_destroy(rwlock *l);
+int rwlock_cond_wait(pthread_cond_t *cond,rwlock *l);
 
 
 /* Straph user's interface */
