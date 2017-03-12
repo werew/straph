@@ -286,23 +286,153 @@ size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
     return size2read;
 }
 
+
+
+    
+size_t cb_read
+(struct c_buf *cb, struct inslot_c *in, 
+ size_t of_end, void *buf, size_t nbyte){
+
+    size_t size_read;   /* Total data read from cb */
+    size_t linear_size; /* Size of the next contiguos read */
+    size_t of_ckend;    /* End of the current chunk */
+    cksize_t cksize;    /* Size of the current chunk */
+    
+    size_read = 0;
+
+    while (size_read < nbyte && in->of_ck != of_end){
+
+        /* Calculate end of the current chunk */
+        cksize   = cb_getcksize(cb,in->of_ck);
+        of_ckend = (in->of_ck + cksize + SIZE_CKHEAD) % cb->sizebuf;
+
+        /*** First read on contiguous memory ***/
+
+        /* Check if the rest of the ck reach the end of the cb */
+        if (in->of_read <= of_ckend){
+            /* Can read all the remaining ck */
+            linear_size = of_ckend - in->of_read;
+        } else {
+            /* Read first contiguos part of the ck */
+            linear_size = cb->sizebuf - in->of_read;
+        }
+
+        /* Limited by the space available on the buffer */
+        linear_size = MIN(linear_size,nbyte-size_read);
+        memcpy(&((char*)buf)[size_read], 
+               &cb->buf[in->of_read], linear_size);
+
+        /* Update size read data and offset unread data */
+        size_read += linear_size;
+        in->of_read = (in->of_read + linear_size) % cb->sizebuf;
+
+        if (in->of_read == 0 && size_read < nbyte){
+            /*** Second read on contiguous memory ***/
+
+            linear_size = MIN(of_ckend,nbyte-size_read);
+            memcpy(&((char*)buf)[size_read], 
+                   &cb->buf[0], linear_size);
+
+            size_read += linear_size;
+            in->of_read = (in->of_read + linear_size) % cb->sizebuf;
+        }
+  
+        /* If we read all the chunk point to the next one */ 
+        if (in->of_read == of_ckend){
+            in->of_ck = of_ckend;
+            in->of_read = (in->of_ck + SIZE_CKHEAD) % cb->sizebuf;
+        }
+    }
+
+    return size_read;
+}
+
+
+void cb_icc(struct c_buf *cb, size_t of_startck, size_t of_endck){
+
+    (void) cb;
+    (void) of_startck;
+    (void) of_endck;
+    return;
+}
+
+
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
-    size_t size_read = 0;
-    /*struct c_buf *cb = in->src->buf; */  /* Circular buffer */
+    ssize_t of_end;     /* End of the readable data on the cb */
+    struct c_buf *cb;   /* Shortcut to the circular buffer */
+    size_t of_startck,size_read;
+    int err;
     
     /* Read from cache */
-    size_read += inc_cacheread(in,buf,nbyte);
+    size_read = inc_cacheread(in,buf,nbyte);
     if (size_read >= nbyte) return size_read; 
 
     /* Read from buffer (nbyte-size_read) + SIZE_CACHE bytes */
-   
+    
+    cb = in->src->buf; 
+
+    if ((err = pthread_mutex_lock(&cb->lock_refs)) != 0){
+        errno = err;
+        return -1;
+    }
+
+    while (1){
 
 
-    return 0; 
+        of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
 
-     
+        if ((err = pthread_mutex_unlock(&cb->lock_refs)) != 0){
+            errno = err;
+            return -1;
+        }
 
+
+        size_read += cb_read(cb, in, of_end, buf, nbyte-size_read);
+
+        if (size_read < nbyte) break;
+
+        /* Atomically increment cnt on chuncks and wait*/
+
+        if ((err = pthread_mutex_lock(&cb->lock_ckcount)) != 0){
+            errno = err;
+            return -1;
+        }
+
+        cb_icc(cb, of_startck, in->of_ck);
+        of_startck = in->of_ck;
+
+        if ((err = pthread_mutex_lock(&cb->lock_refs)) != 0){
+            errno = err;
+            return -1;
+        }
+
+        if ((err = pthread_mutex_unlock(&cb->lock_ckcount)) != 0){
+            errno = err;
+            return -1;
+        }
+
+        if ((err = pthread_cond_broadcast(&cb->cond_free)) != 0) {
+            errno = err;
+            return -1;
+        }
+
+        err = pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs);
+        if (err != 0){
+            pthread_mutex_unlock(&cb->lock_refs);
+            errno = err;
+            return -1;
+        }
+        
+    }
+
+    in->size_cdata = cb_read(cb, in, of_end, buf, nbyte-size_read);
+    size_read += in->size_cdata;
+    
+    cb_icc(cb, of_startck, in->of_ck);
+
+
+    return size_read; 
 }
 
 
