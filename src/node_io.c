@@ -56,7 +56,6 @@ inline void cb_writechunk
 
 ssize_t cb_genfreespace
 (struct c_buf *cb, ckcount_t maxreads, bool blocking){
-    int err;
     ssize_t freedsize;
     size_t of_ck, end;
   
@@ -64,10 +63,7 @@ ssize_t cb_genfreespace
     of_ck = cb->data_start;
     end   = (cb->data_start+cb->data_size) % cb->sizebuf;
 
-    if ((err = pthread_mutex_lock(&cb->lock_ckcount)) != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
     while (1){
 
@@ -92,14 +88,13 @@ ssize_t cb_genfreespace
 
         if ( blocking == false || freedsize != 0) break;
 
-        pthread_cond_wait(&cb->cond_free, &cb->lock_ckcount);
+        /* TODO look for eventual cleaning */
+        PTH_ERRCK_NC(pthread_cond_wait(&cb->cond_free, 
+                        &cb->lock_ckcount))
 
     }
 
-    if ((err = pthread_mutex_unlock(&cb->lock_ckcount)) != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
 
     return freedsize;
 }
@@ -121,40 +116,26 @@ inline size_t cb_realfreespace(size_t free_space){
 
 /* Update: start+=new_freespace, used-=new_freespace */
 ssize_t cb_release(struct c_buf *cb, size_t nbyte){
-    int err;
 
-    if ((err = pthread_mutex_lock(&cb->lock_refs)) != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     cb->data_start = (cb->data_start + nbyte) % cb->sizebuf;
     cb->data_size -=  nbyte;
 
-    if ((err = pthread_mutex_unlock(&cb->lock_refs)) != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
     return 0;
 }
 
 /* Update: used += space_used, notify */
 ssize_t cb_acquire(struct c_buf *cb, size_t nbyte){
-    int err;
 
-    if ((err = pthread_mutex_lock(&cb->lock_refs)) != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     cb->data_size +=  nbyte;
 
-    if ((err = pthread_mutex_unlock(&cb->lock_refs))    != 0 ||
-        (err = pthread_cond_broadcast(&cb->cond_free)) != 0 ){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
+    PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
 
     return 0;
 }
@@ -357,12 +338,13 @@ void cb_icc(struct c_buf *cb, size_t of_startck, size_t of_endck){
 }
 
 
+
+
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     ssize_t of_end;     /* End of the readable data on the cb */
     struct c_buf *cb;   /* Shortcut to the circular buffer */
     size_t of_startck,size_read;
-    int err;
     
     /* Read from cache */
     size_read = inc_cacheread(in,buf,nbyte);
@@ -372,58 +354,33 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     
     cb = in->src->buf; 
 
-    if ((err = pthread_mutex_lock(&cb->lock_refs)) != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     while (1){
 
 
         of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
 
-        if ((err = pthread_mutex_unlock(&cb->lock_refs)) != 0){
-            errno = err;
-            return -1;
-        }
-
+        PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
         size_read += cb_read(cb, in, of_end, buf, nbyte-size_read);
 
         if (size_read < nbyte) break;
 
         /* Atomically increment cnt on chuncks and wait*/
-
-        if ((err = pthread_mutex_lock(&cb->lock_ckcount)) != 0){
-            errno = err;
-            return -1;
-        }
+        PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
         cb_icc(cb, of_startck, in->of_ck);
         of_startck = in->of_ck;
 
-        if ((err = pthread_mutex_lock(&cb->lock_refs)) != 0){
-            errno = err;
-            return -1;
-        }
-
-        if ((err = pthread_mutex_unlock(&cb->lock_ckcount)) != 0){
-            errno = err;
-            return -1;
-        }
-
-        if ((err = pthread_cond_broadcast(&cb->cond_free)) != 0) {
-            errno = err;
-            return -1;
-        }
-
-        err = pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs);
-        if (err != 0){
-            pthread_mutex_unlock(&cb->lock_refs);
-            errno = err;
-            return -1;
-        }
-        
+        PTH_ERRCK(pthread_mutex_lock(&cb->lock_refs),
+                  pthread_mutex_unlock(&cb->lock_ckcount);)
+        PTH_ERRCK(pthread_mutex_unlock(&cb->lock_ckcount),
+                  pthread_mutex_unlock(&cb->lock_refs);)
+        PTH_ERRCK(pthread_cond_broadcast(&cb->cond_free),
+                  pthread_mutex_unlock(&cb->lock_refs);)
+        PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs),
+                  pthread_mutex_unlock(&cb->lock_refs);)
     }
 
     in->size_cdata = cb_read(cb, in, of_end, buf, nbyte-size_read);
@@ -442,8 +399,6 @@ ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte){
 
     /* Linear buffer */
     struct l_buf *lb = ob->buf;
-
-    int err;
     size_t space_available;
     size_t write_size;
 
@@ -463,23 +418,14 @@ ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte){
     memcpy(&lb->buf[lb->of_empty], buf, write_size);
     
     /* Update offset */
-    if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_lock(&lb->mutex))
 
     lb->of_empty += write_size; /* Update */
 
-    if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_unlock(&lb->mutex))
 
     /* Signal new available data */
-    if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_cond_broadcast(&lb->cond))
     
     return nbyte; 
 }
@@ -494,16 +440,10 @@ int st_bufstatlb(struct l_buf* lb, int status){
 
     lb->status = status; /* Update */
 
-    if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_unlock(&lb->mutex))
 
     /* Awake every waiting reader  */
-    if ((err = pthread_cond_broadcast(&lb->cond)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_cond_broadcast(&lb->cond)) 
     
     return 0; 
 }
@@ -531,7 +471,6 @@ int st_bufstat(node n, unsigned int slot, int status){
 
 
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
-    int err;
 
     /* Source buffer */
     struct l_buf* lb = in->src->buf;
@@ -547,23 +486,16 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
     if (nbyte == 0) return 0;
 
     /* Lock access */
-    if ((err = pthread_mutex_lock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_lock(&lb->mutex))
     
     /* Wait condition */
     while (lb->of_empty - in->of_start < nbyte &&
            lb->status != BUF_INACTIVE          ){
 
 
-        err = pthread_cond_wait(&lb->cond, &lb->mutex);
-        if (err != 0){
-            pthread_mutex_unlock(&lb->mutex);
-            errno = err;
-            perror("Error:");
-            return -1;
-        }
+        PTH_ERRCK(pthread_cond_wait(&lb->cond, &lb->mutex),
+                  pthread_mutex_unlock(&lb->mutex);
+                  perror("Error:");)
     }
 
     if (lb->status == BUF_INACTIVE){
@@ -571,10 +503,7 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
     }
 
     /* Unlock access */
-    if ((err = pthread_mutex_unlock(&lb->mutex)) != 0) {
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_unlock(&lb->mutex))
 
     /* Perform read */
     memcpy(buf, &lb->buf[in->of_start], nbyte);
@@ -659,6 +588,7 @@ struct l_buf* st_makelb(size_t sizebuf){
         (err = pthread_cond_init(&b->cond, NULL))   != 0 ){
         free(b->buf);
         free(b);
+        errno = err;
         return NULL;
     }
 
@@ -726,33 +656,20 @@ struct inslot_l* st_makeinslotc(struct out_buf* b){
 
 
 int st_destroylb(struct l_buf* b){
-    int err;
-    if ((err = pthread_mutex_destroy(&b->mutex)) != 0 ||
-        (err = pthread_cond_destroy(&b->cond))   != 0 ){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_destroy(&b->mutex))
+    PTH_ERRCK_NC(pthread_cond_destroy(&b->cond))
+
     free(b->buf);
     free(b);
     return 0;
 }
 
 int st_destroycb(struct c_buf* b){
-    int err;
-
     free(b->buf);
 
-    err = pthread_mutex_destroy(&b->lock_refs);
-    if (err != 0){
-        errno = err;
-        return -1;
-    }
-
-    err = pthread_mutex_destroy(&b->lock_ckcount);
-    if (err != 0){
-        errno = err;
-        return -1;
-    }
+    PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_refs))
+    PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_ckcount))
+    /* TODO propertly destroy cb */
     
     return 0;
 }
