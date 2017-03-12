@@ -353,21 +353,21 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     ssize_t of_end;     /* End of the readable data on the cb */
     struct c_buf *cb;   /* Shortcut to the circular buffer */
-    size_t of_startck,size_read;
+    size_t of_startck;  /* First ck of each read (used for cb_icc) */ 
+    size_t size_read;   /* Total size that was read */
     
+
     /* Read from cache */
     size_read = inc_cacheread(in,buf,nbyte);
     if (size_read >= nbyte) return size_read; 
 
-    /* Read from buffer (nbyte-size_read) + SIZE_CACHE bytes */
-    
-    cb = in->src->buf; 
+    /* Read from buffer */
+    cb = in->src->buf;
+    of_startck = in->of_ck;
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     while (1){
-        /* TODO of_startck ?? */
-
 
         of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
 
