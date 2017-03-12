@@ -330,20 +330,30 @@ size_t cb_read
 
 
 /* Increment cnt chunks from of_startck to of_endck excluded */
-void cb_icc(struct c_buf *cb, size_t of_startck, size_t of_endck){
+int isc_icc(struct inslot_c* isc, size_t of_startck, size_t of_endck){
 
+    int freed;
     ckcount_t cnt;
     cksize_t  sizeck;
+    struct c_buf *cb;
+
+
+    freed = 0;
+    cb = isc->src->buf;
 
     while (of_startck != of_endck){
         /* Increment count of current chunk */
         cnt  = cb_getckcount(cb,of_startck) + 1;
         CB_WRITEUI16(cb,of_startck,&cnt)
+
+        if (cnt >= isc->src->nreaders) freed++;
        
         /* Go to the nex chunk */ 
         sizeck = cb_getcksize(cb,of_startck);
         of_startck = (of_startck+SIZE_CKHEAD+sizeck) % cb->sizebuf; 
     }
+
+    return freed;
 }
 
 
@@ -368,6 +378,8 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     while (1){
+        /* TODO 1 signal only when cnt = maxcnt */
+        /* TODO 2 fix mutex-conds correspondences between reader and writer */
 
         of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
 
@@ -380,7 +392,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         /* Atomically increment cnt on chuncks and wait*/
         PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
-        cb_icc(cb, of_startck, in->of_ck);
+        isc_icc(in, of_startck, in->of_ck);
         of_startck = in->of_ck;
 
         PTH_ERRCK(pthread_mutex_lock(&cb->lock_refs),
@@ -399,7 +411,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
-    cb_icc(cb, of_startck, in->of_ck);
+    isc_icc(in, of_startck, in->of_ck);
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
     PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
