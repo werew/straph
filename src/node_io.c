@@ -393,12 +393,16 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
                   pthread_mutex_unlock(&cb->lock_refs);)
     }
 
-    /* TODO lock/unlock */
+
     in->size_cdata = cb_read(cb, in, of_end, buf, nbyte-size_read);
     size_read += in->size_cdata;
     
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
+
     cb_icc(cb, of_startck, in->of_ck);
 
+    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
+    PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
 
     return size_read; 
 }
