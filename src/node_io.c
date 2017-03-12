@@ -374,7 +374,6 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     /* Read from buffer */
     cb = in->src->buf;
-    of_startck = in->of_ck;
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
@@ -385,6 +384,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
         PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
+        of_startck = in->of_ck;
         size_read += cb_read(cb, in, of_end, buf, nbyte-size_read);
 
         if (size_read < nbyte) break;
@@ -393,7 +393,6 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
         freed_cks = isc_icc(in, of_startck, in->of_ck);
-        of_startck = in->of_ck;
 
         PTH_ERRCK(pthread_mutex_lock(&cb->lock_refs),
                   pthread_mutex_unlock(&cb->lock_ckcount);)
