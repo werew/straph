@@ -329,12 +329,21 @@ size_t cb_read
 }
 
 
+/* Increment cnt chunks from of_startck to of_endck excluded */
 void cb_icc(struct c_buf *cb, size_t of_startck, size_t of_endck){
 
-    (void) cb;
-    (void) of_startck;
-    (void) of_endck;
-    return;
+    ckcount_t cnt;
+    cksize_t  sizeck;
+
+    while (of_startck != of_endck){
+        /* Increment count of current chunk */
+        cnt  = cb_getckcount(cb,of_startck) + 1;
+        CB_WRITEUI16(cb,of_startck,&cnt)
+       
+        /* Go to the nex chunk */ 
+        sizeck = cb_getcksize(cb,of_startck);
+        of_startck = (of_startck+SIZE_CKHEAD+sizeck) % cb->sizebuf; 
+    }
 }
 
 
@@ -357,6 +366,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     while (1){
+        /* TODO of_startck ?? */
 
 
         of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
@@ -383,6 +393,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
                   pthread_mutex_unlock(&cb->lock_refs);)
     }
 
+    /* TODO lock/unlock */
     in->size_cdata = cb_read(cb, in, of_end, buf, nbyte-size_read);
     size_read += in->size_cdata;
     
