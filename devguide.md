@@ -8,6 +8,12 @@ Shorts
 straph = st
 node   = nd
 buffer = buf
+chunk  = ck
+input slot circular buffer = isc
+input slot linear buf = isl
+circular buf = cb
+
+
 
 Comments
 
