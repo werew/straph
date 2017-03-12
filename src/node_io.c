@@ -365,6 +365,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     struct c_buf *cb;   /* Shortcut to the circular buffer */
     size_t of_startck;  /* First ck of each read (used for cb_icc) */ 
     size_t size_read;   /* Total size that was read */
+    int freed_cks;
     
 
     /* Read from cache */
@@ -378,8 +379,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
     while (1){
-        /* TODO 1 signal only when cnt = maxcnt */
-        /* TODO 2 fix mutex-conds correspondences between reader and writer */
+        /* TODO fix mutex-conds correspondences between reader and writer */
 
         of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
 
@@ -392,15 +392,19 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         /* Atomically increment cnt on chuncks and wait*/
         PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
-        isc_icc(in, of_startck, in->of_ck);
+        freed_cks = isc_icc(in, of_startck, in->of_ck);
         of_startck = in->of_ck;
 
         PTH_ERRCK(pthread_mutex_lock(&cb->lock_refs),
                   pthread_mutex_unlock(&cb->lock_ckcount);)
         PTH_ERRCK(pthread_mutex_unlock(&cb->lock_ckcount),
                   pthread_mutex_unlock(&cb->lock_refs);)
-        PTH_ERRCK(pthread_cond_broadcast(&cb->cond_free),
+
+        if (freed_cks > 0){
+            PTH_ERRCK(pthread_cond_broadcast(&cb->cond_free),
                   pthread_mutex_unlock(&cb->lock_refs);)
+        }
+
         PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs),
                   pthread_mutex_unlock(&cb->lock_refs);)
     }
@@ -411,10 +415,13 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
-    isc_icc(in, of_startck, in->of_ck);
+    freed_cks = isc_icc(in, of_startck, in->of_ck);
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
-    PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
+
+    if (freed_cks > 0){
+        PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
+    }
 
     return size_read; 
 }
