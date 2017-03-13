@@ -375,13 +375,16 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     /* Read from buffer */
     cb = in->src->buf;
 
-    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
-
     while (1){
-        /* TODO fix mutex-conds correspondences between reader and writer */
-        /* TODO make sure of the atomicity of the writer/reader operations */
+        PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
-        of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
+            while (1){
+                of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
+                if (in->of_ck != of_end) break;
+
+                PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, 
+                    &cb->lock_refs), pthread_mutex_unlock(&cb->lock_refs);)
+            }
 
         PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
@@ -390,23 +393,17 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
         if (size_read < nbyte) break;
 
-        /* Atomically increment cnt on chuncks and wait*/
+        /* Increment cnt on chuncks to generate new free chunks */
         PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
         freed_cks = isc_icc(in, of_startck, in->of_ck);
 
-        PTH_ERRCK(pthread_mutex_lock(&cb->lock_refs),
-                  pthread_mutex_unlock(&cb->lock_ckcount);)
-        PTH_ERRCK(pthread_mutex_unlock(&cb->lock_ckcount),
-                  pthread_mutex_unlock(&cb->lock_refs);)
+        PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
 
         if (freed_cks > 0){
             PTH_ERRCK(pthread_cond_broadcast(&cb->cond_free),
                   pthread_mutex_unlock(&cb->lock_refs);)
         }
-
-        PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs),
-                  pthread_mutex_unlock(&cb->lock_refs);)
     }
 
 
