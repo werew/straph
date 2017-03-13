@@ -135,7 +135,7 @@ ssize_t cb_acquire(struct c_buf *cb, size_t nbyte){
     cb->data_size +=  nbyte;
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
-    PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
+    PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_acquire))
 
     return 0;
 }
@@ -379,6 +379,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     while (1){
         /* TODO fix mutex-conds correspondences between reader and writer */
+        /* TODO make sure of the atomicity of the writer/reader operations */
 
         of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
 
