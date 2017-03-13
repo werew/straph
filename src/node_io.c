@@ -201,6 +201,7 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
         if (new_freespace > 0){
             total_freespace += new_freespace;
             real_freespace = cb_realfreespace(total_freespace);
+            /* XXX is release necessary ? */
             if (cb_release(cb, new_freespace) == -1) return -1; 
         }
     }
@@ -217,16 +218,17 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
             (char*) buf + size_written, size_write);
         of_start += space_used; total_freespace -= space_used;
 
+        /* Update cb and notify new data */
+        if (cb_acquire(cb, space_used) == -1) return -1; 
+
         /* Stop writing if we wrote nbyte of data */
         size_written += size_write;
         if (size_written >= nbyte) break;
 
-        /* Update cb and notify new data */
-        if (cb_acquire(cb, space_used) == -1) return -1; 
-
         /* Free more data, waiting if necessary */
         if ((new_freespace = cb_genfreespace
                 (cb,ob->nreaders, true)) == -1  ||
+            /* XXX is release necessary ? */
              cb_release(cb, new_freespace) == -1 ) return -1;
 
         /* Update free space count */
@@ -366,7 +368,8 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     size_t of_startck;  /* First ck of each read (used for cb_icc) */ 
     size_t size_read;   /* Total size that was read */
     int freed_cks;
-    
+
+    /* TODO bring locks inside sub-functions */
 
     /* Read from cache */
     size_read = inc_cacheread(in,buf,nbyte);
@@ -561,7 +564,7 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
         case LIN_BUF: 
             return st_readlb(n->inslots[slot], buf, nbyte);
         case CIR_BUF: 
-            return 0; 
+            return st_cbread(n->inslots[slot], buf, nbyte);
         default: 
             errno = EINVAL;
             return -1;
