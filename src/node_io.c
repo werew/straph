@@ -391,7 +391,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         of_startck = in->of_ck;
         size_read += cb_read(cb, in, of_end, buf, nbyte-size_read);
 
-        if (size_read < nbyte) break;
+        if (size_read >= nbyte) break;
 
         /* Increment cnt on chuncks to generate new free chunks */
         PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
