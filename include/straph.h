@@ -334,7 +334,7 @@ int st_destroycb(struct c_buf* b);
 int st_destroylb(struct l_buf* b);
 int st_destroyb(struct out_buf *buf);
 struct inslot_l* st_makeinslotl(struct out_buf* b);
-struct inslot_l* st_makeinslotc(struct out_buf* b);
+struct inslot_c* st_makeinslotc(struct out_buf* b);
 int st_nstart(node n);
 void* st_threadwrapper(void* n);
 ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte);

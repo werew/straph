@@ -679,11 +679,12 @@ struct inslot_l* st_makeinslotl(struct out_buf* b){
     return is;
 }
 
-struct inslot_l* st_makeinslotc(struct out_buf* b){
-    struct inslot_l* is = calloc(1,sizeof(struct inslot_l));
+struct inslot_c* st_makeinslotc(struct out_buf* b){
+    struct inslot_c* is = calloc(1,sizeof(struct inslot_l));
     if (is == NULL) return NULL;
 
     is->src = b;
+    is->of_read = SIZE_CKHEAD;
     return is;
 }
 
