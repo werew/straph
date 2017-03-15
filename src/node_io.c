@@ -60,8 +60,8 @@ ssize_t cb_genfreespace
     size_t of_ck, end;
   
     freedsize = 0; 
-    of_ck = cb->data_start;
-    end   = (cb->data_start+cb->data_size) % cb->sizebuf;
+    of_ck = cb->data_transf % cb->sizebuf;
+    end   = cb->data_written % cb->sizebuf;
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
@@ -119,8 +119,7 @@ ssize_t cb_release(struct c_buf *cb, size_t nbyte){
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
-    cb->data_start = (cb->data_start + nbyte) % cb->sizebuf;
-    cb->data_size -=  nbyte;
+    cb->data_transf += nbyte;
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
@@ -132,7 +131,7 @@ ssize_t cb_acquire(struct c_buf *cb, size_t nbyte){
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
-    cb->data_size +=  nbyte;
+    cb->data_written +=  nbyte;
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
     PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_acquire))
@@ -183,10 +182,10 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
     size_written = 0;
 
     /* Offset from where we will start writing */
-    of_start = (cb->data_start+cb->data_size) % cb->sizebuf;
+    of_start = cb->data_written % cb->sizebuf;
 
     /* Get available free space */
-    total_freespace = cb->sizebuf - cb->data_size;
+    total_freespace = cb->sizebuf - (cb->data_written - cb->data_transf);
     real_freespace  = cb_realfreespace(total_freespace);
 
     /* If the space is not enough try to free some more */
@@ -382,7 +381,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
             while (1){
-                of_end = (cb->data_start + cb->data_size) % cb->sizebuf;
+                of_end = cb->data_written % cb->sizebuf;
                 if (in->of_ck != of_end) break;
 
                 PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, 
@@ -664,8 +663,8 @@ struct c_buf* st_makecb(size_t sizebuf){
     }
 
     b->sizebuf = sizebuf;
-    b->data_start = 0;
-    b->data_size = 0;
+    b->data_transf  = 0;
+    b->data_written = 0;
 
     return b;
 }

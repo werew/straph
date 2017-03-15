@@ -103,8 +103,10 @@ struct l_buf {
 struct c_buf {
     char* buf;                  /* Pointer to the buf */
     unsigned int sizebuf;       /* Size of the buf */
-    unsigned int data_start;   
-    unsigned int data_size;     
+
+    size_t data_written;        /* Total data written to buf */
+    size_t data_transf;         /* Total data writtan to the buf
+                                   and consumed by all readers */
 
     pthread_mutex_t lock_ckcount;    /* Concurrent reads/writes of the 
                                         count header of the chunks */
