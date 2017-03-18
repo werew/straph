@@ -661,39 +661,36 @@ struct c_buf* st_makecb(size_t sizebuf){
     int err;
     struct c_buf* b;
 
-    b = malloc(sizeof(struct c_buf));
-    if (b == NULL) return NULL;
-
-    if ((err = pthread_mutex_init(&b->lock_refs,
-                    NULL)) != 0){
-        free(b);
-        errno = err;
-        return NULL;
+    if ((b = malloc(sizeof(struct c_buf))) == NULL) return NULL;
+    if ((b->buf = malloc(sizebuf)) == NULL){
+        free(b); return NULL;
     }
 
-    if ((err = pthread_mutex_init(&b->lock_ckcount,
-                    NULL)) != 0){
-        pthread_mutex_destroy(&b->lock_refs);
-        free(b);
-        errno = err;
-        return NULL;
-    }
-
-    b->buf = malloc(sizebuf);
-    if (b->buf == NULL) {
-        err = errno;
-        pthread_mutex_destroy(&b->lock_refs);
-        pthread_mutex_destroy(&b->lock_ckcount);
-        free(b);
-        errno = err;
-        return NULL;
-    }
+    if ((err = pthread_mutex_init(&b->lock_refs,NULL)) != 0) 
+        goto error_1;
+    if ((err = pthread_mutex_init(&b->lock_ckcount,NULL)) != 0) 
+        goto error_2;
+    if ((err = pthread_cond_init(&b->cond_free,NULL)) != 0)
+        goto error_3;
+    if ((err = pthread_cond_init(&b->cond_acquire,NULL)) != 0) 
+        goto error_4;
 
     b->sizebuf = sizebuf;
     b->data_transf  = 0;
     b->data_written = 0;
 
     return b;
+
+error_4:
+    pthread_cond_destroy(&b->cond_free);
+error_3:
+    pthread_mutex_destroy(&b->lock_ckcount);
+error_2:
+    pthread_mutex_destroy(&b->lock_refs);
+error_1:
+    free(b);
+    errno = err;
+    return NULL;
 }
 
 struct inslot_l* st_makeinslotl(struct out_buf* b){
