@@ -280,14 +280,12 @@ struct cb_transf cb_read
 
 /* BIG TODO: naming !!!!! */
 
-    size_t size_read;   /* Total data read from cb */
     size_t linear_size; /* Size of the next contiguos read */
     size_t of_ckend;    /* End of the current chunk */
     size_t of_read;
     cksize_t cksize;    /* Size of the current chunk */
     
     struct cb_transf tr = {0,0,0};
-    size_read = 0;
     of_read = in->data_read % cb->sizebuf;
 
     while (tr.data_size < nbyte && tr.real_size < data_av){
@@ -326,8 +324,8 @@ struct cb_transf cb_read
         if (of_read == 0 && tr.data_size < nbyte){
             /*** Second read on contiguous memory ***/
 
-            linear_size = MIN(of_ckend,nbyte-size_read);
-            memcpy(&((char*)buf)[size_read], 
+            linear_size = MIN(of_ckend,nbyte-tr.data_size);
+            memcpy(&((char*)buf)[tr.data_size], 
                    &cb->buf[0], linear_size);
 
             tr.data_size += linear_size;
