@@ -442,15 +442,16 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     }
 
     /* 3 - Transfear remaning data to the cache */
+    cks_passed = tr.cks_passed;
     if (data_av > 0){
-        cks_passed = tr.cks_passed;
         tr = cb_read(cb, data_av, in, in->cache, SIZE_CACHE);
+        cks_passed += tr.cks_passed;
         in->size_cdata = tr.real_size;
         size_read += tr.data_size;
     }
     
     /* Mark chunks and signals free chunks */
-    isc_icc(in, of_startck, tr.cks_passed+cks_passed);
+    isc_icc(in, of_startck, cks_passed);
 
     return size_read; 
 }
