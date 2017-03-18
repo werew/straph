@@ -430,7 +430,8 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
         /* Transfer data to user's buffer */
         of_startck = in->of_ck; 
-        tr = cb_read(cb, data_av, in, buf, nbyte-size_read);
+        tr = cb_read(cb, data_av, in, 
+             &((char*)buf)[size_read], nbyte-size_read);
 
         /* Update */
         data_av -= tr.real_size;
