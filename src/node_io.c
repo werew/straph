@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include "straph.h"
 
+
+
 typedef enum{false,true} bool;
 
 
@@ -76,10 +78,10 @@ ssize_t cb_genfreespace
             if (ckcount < maxreads) break;
 
             /* Consider the total size of the ck as free */ 
+            CB_READUI16(cb,of_ck+sizeof(ckcount_t),&cksize);
             freedsize += SIZE_CKHEAD + cksize;
 
             /* Move to next ck */
-            CB_READUI16(cb,of_ck+sizeof(ckcount_t),&cksize);
             of_ck = (of_ck + SIZE_CKHEAD+cksize) % cb->sizebuf;
             
             /* Stop, ck finished */
@@ -142,12 +144,13 @@ ssize_t cb_acquire(struct c_buf *cb, size_t nbyte){
 /**
  * @brief writes directly data into cb (as chunks) without
  *        any previous check (the space is supposed to be free)
- * @return the offset of the last chunk written 
+ * @return space used
  */
 size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nbyte){
 
     size_t size_written = 0;
     cksize_t size_chunk = 0;
+    if (nbyte == 0) return 0;
 
     while (nbyte > size_written){
 
@@ -270,79 +273,97 @@ size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
 
 
 
-    
-size_t cb_read
-(struct c_buf *cb, struct inslot_c *in, 
- size_t of_end, void *buf, size_t nbyte){
+
+struct cb_transf cb_read
+(struct c_buf *cb, size_t data_av, 
+ struct inslot_c *in, void *buf, size_t nbyte){
+
+/* BIG TODO: naming !!!!! */
 
     size_t size_read;   /* Total data read from cb */
     size_t linear_size; /* Size of the next contiguos read */
     size_t of_ckend;    /* End of the current chunk */
+    size_t of_read;
     cksize_t cksize;    /* Size of the current chunk */
     
+    struct cb_transf tr = {0,0,0};
     size_read = 0;
+    of_read = in->data_read % cb->sizebuf;
 
-    while (size_read < nbyte && in->of_ck != of_end){
+    while (tr.data_size < nbyte && tr.real_size < data_av){
 
         /* Calculate end of the current chunk */
         cksize   = cb_getcksize(cb,in->of_ck);
         of_ckend = (in->of_ck + cksize + SIZE_CKHEAD) % cb->sizebuf;
 
+        /* If we are at the beginning of the chunk, consider the header as read */
+        if (of_read == in->of_ck){
+            of_read = (in->of_ck + SIZE_CKHEAD) % cb->sizebuf;
+            tr.real_size += SIZE_CKHEAD;
+        }
+
         /*** First read on contiguous memory ***/
 
         /* Check if the rest of the ck reach the end of the cb */
-        if (in->of_read <= of_ckend){
+        if (of_read <= of_ckend){
             /* Can read all the remaining ck */
-            linear_size = of_ckend - in->of_read;
+            linear_size = of_ckend - of_read;
         } else {
             /* Read first contiguos part of the ck */
-            linear_size = cb->sizebuf - in->of_read;
+            linear_size = cb->sizebuf - of_read;
         }
 
         /* Limited by the space available on the buffer */
-        linear_size = MIN(linear_size,nbyte-size_read);
-        memcpy(&((char*)buf)[size_read], 
-               &cb->buf[in->of_read], linear_size);
+        linear_size = MIN(linear_size,nbyte-tr.data_size);
+        memcpy(&((char*)buf)[tr.data_size], 
+               &cb->buf[of_read], linear_size);
 
         /* Update size read data and offset unread data */
-        size_read += linear_size;
-        in->of_read = (in->of_read + linear_size) % cb->sizebuf;
+        tr.data_size += linear_size;
+        tr.real_size += linear_size;
+        of_read = (of_read + linear_size) % cb->sizebuf;
 
-        if (in->of_read == 0 && size_read < nbyte){
+        if (of_read == 0 && tr.data_size < nbyte){
             /*** Second read on contiguous memory ***/
 
             linear_size = MIN(of_ckend,nbyte-size_read);
             memcpy(&((char*)buf)[size_read], 
                    &cb->buf[0], linear_size);
 
-            size_read += linear_size;
-            in->of_read = (in->of_read + linear_size) % cb->sizebuf;
+            tr.data_size += linear_size;
+            tr.real_size += linear_size;
+            of_read = (of_read + linear_size) % cb->sizebuf;
         }
   
         /* If we read all the chunk point to the next one */ 
-        if (in->of_read == of_ckend){
+        if (of_read == of_ckend){
             in->of_ck = of_ckend;
-            in->of_read = (in->of_ck + SIZE_CKHEAD) % cb->sizebuf;
+            tr.cks_passed += 1;
         }
     }
 
-    return size_read;
+    in->data_read += tr.real_size;
+
+    return tr;
 }
 
 
 /* Increment cnt chunks from of_startck to of_endck excluded */
-int isc_icc(struct inslot_c* isc, size_t of_startck, size_t of_endck){
+int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
 
     int freed;
     ckcount_t cnt;
     cksize_t  sizeck;
     struct c_buf *cb;
+    unsigned int i;
 
 
     freed = 0;
     cb = isc->src->buf;
 
-    while (of_startck != of_endck){
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
+
+    for (i = 0; i < ncks; i++){
         /* Increment count of current chunk */
         cnt  = cb_getckcount(cb,of_startck) + 1;
         CB_WRITEUI16(cb,of_startck,&cnt)
@@ -354,21 +375,47 @@ int isc_icc(struct inslot_c* isc, size_t of_startck, size_t of_endck){
         of_startck = (of_startck+SIZE_CKHEAD+sizeck) % cb->sizebuf; 
     }
 
+    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
+
+    if (freed > 0){
+        PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free));
+    }
+
     return freed;
 }
+
+
+size_t isc_getavailable(struct inslot_c *in){
+    struct c_buf *cb = in->src->buf;
+    size_t data_available;
+
+    /* Wait for new data if necessary */
+    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
+        while (in->data_read >= cb->data_written){
+            PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs), 
+                      pthread_mutex_unlock(&cb->lock_refs);)
+        }
+
+        data_available = cb->data_written - in->data_read;
+    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
+
+    return data_available;
+}
+
+
+
 
 
 
 
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
-    ssize_t of_end;     /* End of the readable data on the cb */
-    struct c_buf *cb;   /* Shortcut to the circular buffer */
-    size_t of_startck;  /* First ck of each read (used for cb_icc) */ 
-    size_t size_read;   /* Total size that was read */
-    int freed_cks;
-
-    /* TODO bring locks inside sub-functions */
+    struct cb_transf tr; /* Transfer infos */
+    ssize_t data_av;     /* Unread data available on the buffer */
+    struct c_buf *cb;    /* Shortcut to the circular buffer */
+    size_t of_startck;   /* First ck of each read (used for cb_icc) */ 
+    size_t size_read;    /* Total size that was read */
+    unsigned int cks_passed; /* Chunks completed */
 
     /* Read from cache */
     size_read = inc_cacheread(in,buf,nbyte);
@@ -376,51 +423,34 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     /* Read from buffer */
     cb = in->src->buf;
-
     while (1){
-        PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
-            while (1){
-                of_end = cb->data_written % cb->sizebuf;
-                if (in->of_ck != of_end) break;
+        /* Get size of data ready to be read */
+        data_av = isc_getavailable(in);
 
-                PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, 
-                    &cb->lock_refs), pthread_mutex_unlock(&cb->lock_refs);)
-            }
+        /* Transfer data to user's buffer */
+        of_startck = in->of_ck; 
+        tr = cb_read(cb, data_av, in, buf, nbyte-size_read);
 
-        PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
-
-        of_startck = in->of_ck;
-        size_read += cb_read(cb, in, of_end, buf, nbyte-size_read);
-
+        /* Update */
+        data_av -= tr.real_size;
+        size_read += tr.data_size;
         if (size_read >= nbyte) break;
 
-        /* Increment cnt on chuncks to generate new free chunks */
-        PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
-
-        freed_cks = isc_icc(in, of_startck, in->of_ck);
-
-        PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
-
-        if (freed_cks > 0){
-            PTH_ERRCK(pthread_cond_broadcast(&cb->cond_free),
-                  pthread_mutex_unlock(&cb->lock_refs);)
-        }
+        /* Mark chunks and signals free chunks */
+        isc_icc(in, of_startck, tr.cks_passed);
     }
 
-
-    in->size_cdata = cb_read(cb, in, of_end, buf, nbyte-size_read);
-    size_read += in->size_cdata;
+    /* 3 - Transfear remaning data to the cache */
+    if (data_av > 0){
+        cks_passed = tr.cks_passed;
+        tr = cb_read(cb, data_av, in, in->cache, SIZE_CACHE);
+        in->size_cdata = tr.real_size;
+        size_read += tr.data_size;
+    }
     
-    PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
-
-    freed_cks = isc_icc(in, of_startck, in->of_ck);
-
-    PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_ckcount))
-
-    if (freed_cks > 0){
-        PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free))
-    }
+    /* Mark chunks and signals free chunks */
+    isc_icc(in, of_startck, tr.cks_passed+cks_passed);
 
     return size_read; 
 }
@@ -445,8 +475,6 @@ ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte){
                   space_available : nbyte;
 
     if (write_size == 0) return nbyte;
-
-    printf("Writing: %ld bytes\n", write_size);
 
     memcpy(&lb->buf[lb->of_empty], buf, write_size);
     
@@ -629,7 +657,6 @@ struct l_buf* st_makelb(size_t sizebuf){
 }
 
 
-/* TODO initialize */
 struct c_buf* st_makecb(size_t sizebuf){
     int err;
     struct c_buf* b;
@@ -683,7 +710,7 @@ struct inslot_c* st_makeinslotc(struct out_buf* b){
     if (is == NULL) return NULL;
 
     is->src = b;
-    is->of_read = SIZE_CKHEAD;
+    is->data_read = 0;
     return is;
 }
 

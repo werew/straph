@@ -180,8 +180,14 @@ struct inslot_l {
 #define SIZE_CACHE 128
 struct inslot_c {
     struct out_buf* src;      /* Source buffer */
+
+    size_t data_read;         /* Total data read */
+    size_t of_ck;             /* Offset current chunk */
+
+#ifdef false
     unsigned int of_read;     /* Offset unread data */
     unsigned int of_ck;       /* Offset current chunk */
+#endif
 
     /* Cache */
     char cache[SIZE_CACHE];   /* Circular buffer. Each read must 
@@ -194,6 +200,11 @@ struct inslot_c {
 };
 
 
+struct cb_transf {
+    size_t data_size;        /* Data transferred */
+    size_t real_size;        /* Total size transferred */
+    unsigned int cks_passed; /* Chunks finished */
+};
 
 
 
