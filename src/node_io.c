@@ -443,7 +443,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     /* 3 - Transfear remaning data to the cache */
     cks_passed = tr.cks_passed;
     if (data_av > 0){
-        tr = cb_read(cb, data_av, in, in->cache, SIZE_CACHE);
+        tr = cb_read(cb, data_av, in, &in->cache[in->of_cdata], SIZE_CACHE);
         cks_passed += tr.cks_passed;
         in->size_cdata = tr.real_size;
         size_read += tr.data_size;
