@@ -248,9 +248,10 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
  */
 size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
     size_t size2read, linear_size;
-    
+   
     /* Size that will be read from the cache */
     size2read = MIN(in->size_cdata, nbyte);
+    if (size2read == 0) return 0;
     
     /* First contiguous read */
     linear_size = MIN(SIZE_CACHE - in->of_cdata, size2read);
@@ -267,7 +268,7 @@ size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
     }
 
     in->size_cdata -= size2read;
-    
+   
     return size2read;
 }
 
@@ -313,8 +314,11 @@ struct cb_transf cb_read
 
         /* Limited by the space available on the buffer */
         linear_size = MIN(linear_size,nbyte-tr.data_size);
+
+
         memcpy(&((char*)buf)[tr.data_size], 
                &cb->buf[of_read], linear_size);
+    
 
         /* Update size read data and offset unread data */
         tr.data_size += linear_size;
@@ -327,7 +331,6 @@ struct cb_transf cb_read
             linear_size = MIN(of_ckend,nbyte-tr.data_size);
             memcpy(&((char*)buf)[tr.data_size], 
                    &cb->buf[0], linear_size);
-
             tr.data_size += linear_size;
             tr.real_size += linear_size;
             of_read = (of_read + linear_size) % cb->sizebuf;
@@ -445,7 +448,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     if (data_av > 0){
         tr = cb_read(cb, data_av, in, &in->cache[in->of_cdata], SIZE_CACHE);
         cks_passed += tr.cks_passed;
-        in->size_cdata = tr.real_size;
+        in->size_cdata = tr.data_size;
         size_read += tr.data_size;
     }
     
