@@ -703,7 +703,7 @@ struct inslot_l* st_makeinslotl(struct out_buf* b){
 }
 
 struct inslot_c* st_makeinslotc(struct out_buf* b){
-    struct inslot_c* is = calloc(1,sizeof(struct inslot_l));
+    struct inslot_c* is = calloc(1,sizeof(struct inslot_c));
     if (is == NULL) return NULL;
 
     is->src = b;
