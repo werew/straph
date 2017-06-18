@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <pthread.h>
 
+
+/* Error check posix threads */
 #define PTH_ERRCK(fun_call,cleaning)  \
 {                                     \
     int _err = (fun_call);            \
@@ -15,6 +17,7 @@
     }                                 \
 }
 
+/* Error check posix threads without cleaning */
 #define NOARG
 #define PTH_ERRCK_NC(fun_call) PTH_ERRCK(fun_call,NOARG)
 
@@ -32,13 +35,6 @@ struct linked_fifo {
     struct lf_cell* first; /* Least recent cell of the list */
     struct lf_cell* last;  /* Most recent cell of the list  */
 };
-
-/* Mutex-based readers-writer lock */
-typedef struct {
-    unsigned int n_r;   /* Readers count */
-    pthread_mutex_t r;  /* Lock for readers count */
-    pthread_mutex_t w;  /* Writer lock */
-} rwlock;
 
 
 /**************** Node's output buffers ******************/
@@ -313,15 +309,6 @@ int lf_push(struct linked_fifo* lf, void* el);
 void* lf_pop(struct linked_fifo* lf);
 void lf_drop(struct linked_fifo* lf);
 
-
-/* Read/Write locks */
-int rwlock_rlock(rwlock *l);
-int rwlock_runlock(rwlock *l);
-int rwlock_wlock(rwlock *l);
-int rwlock_wunlock(rwlock *l);
-int rwlock_init(rwlock *l);
-int rwlock_destroy(rwlock *l);
-int rwlock_cond_wait(pthread_cond_t *cond,rwlock *l);
 
 
 /* Straph user's interface */
