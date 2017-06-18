@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "straph.h"
+#include "linked_fifo.h"
 
 
 
@@ -54,8 +54,6 @@ void* lf_pop(struct linked_fifo* lf){
 
     return el;
 }
-
-
 
 
 
