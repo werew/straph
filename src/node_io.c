@@ -9,8 +9,17 @@
 
 
 typedef enum{false,true} bool;
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
 
 
+
+/**
+ * @brief get the count field of a chunk (i.e. number of times
+ *        the chunk was read)
+ * @param cb Pointer to a circular buffer
+ * @param of_ck Offset to the chunk
+ * @return The number of times the chunk was read
+ */
 inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck){
     ckcount_t s;
     CB_READUI16(cb,of_ck,&s);
@@ -18,13 +27,18 @@ inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck){
 }
 
 
+/**
+ * @brief get the size field of a chunk 
+ * @param cb Pointer to a circular buffer
+ * @param of_ck Offset to the chunk
+ * @return Size of the chunk in bytes
+ */
 inline cksize_t cb_getcksize(struct c_buf *cb, unsigned int of_ck){
     cksize_t s;
     CB_READUI16(cb,of_ck+2,&s);
     return s;
 }
 
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
 
 /* Note: Does not update of_lastck */
 /* Note: Does not check for free space*/
@@ -56,6 +70,18 @@ inline void cb_writechunk
 }
 
 
+
+/**
+ * @brief Calculate the space occupied by chunks
+ *        that reached maxreads reads
+ * @param cb Circular buffer
+ * @param maxreads Number of reads beyond what
+ *        a chunk has to be considered as free
+ * @param blocking If true wait for free chunks 
+ *        if none is currently available
+ * @return The size occupied by releasable chunks 
+ *         or -1 in case of error
+ */
 ssize_t cb_genfreespace
 (struct c_buf *cb, ckcount_t maxreads, bool blocking){
     ssize_t freedsize;
@@ -103,10 +129,13 @@ ssize_t cb_genfreespace
 
 
 
-/*
-  Subtracting the size of the headers to obtain
-  the amount of space available for data transmission
-*/
+/**
+ * @brief Calculate the effective space available for
+ *        data transfer by calculation the number of chunks 
+ *        needed and subtracting the size of the headers
+ * @param free_space Total free space       
+ * @return Effective free space for data transfer
+ */
 inline size_t cb_realfreespace(size_t free_space){
     size_t min_chunks;
 
@@ -173,13 +202,13 @@ size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nby
 
 ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
 
-    /* Circular buffer */
-    struct c_buf *cb = ob->buf;
-
     unsigned int of_start;
     size_t total_freespace, real_freespace;
     ssize_t new_freespace;
     size_t size_written, space_used;
+
+    /* Circular buffer */
+    struct c_buf *cb = ob->buf;
 
     /* Amout of data transferred to cb */
     size_written = 0;
