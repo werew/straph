@@ -22,6 +22,7 @@
 #define NOARG
 #define PTH_ERRCK_NC(fun_call) PTH_ERRCK(fun_call,NOARG)
 
+
 /**************** Node's output buffers ******************/
 
 /* Buffer types */
@@ -284,15 +285,6 @@ typedef struct s_straph {
     unsigned int nb_entries; /* Number of neighbours */
 } *straph;
 
-
-
-
-
-/* Linked fifos */
-void lf_init(struct linked_fifo* lf);
-int lf_push(struct linked_fifo* lf, void* el);
-void* lf_pop(struct linked_fifo* lf);
-void lf_drop(struct linked_fifo* lf);
 
 
 
