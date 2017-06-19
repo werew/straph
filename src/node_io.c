@@ -145,7 +145,15 @@ inline size_t cb_realfreespace(size_t free_space){
 }
 
 
-/* Update: start+=new_freespace, used-=new_freespace */
+/**
+ * @brief Release space previously used. The space released
+ *        is available for use. In other words, reduces the size
+ *        of the space used
+ * @param cb Circular buffer from where release the space
+ * @param nbyte Number of bytes to release
+ * @return 0 in case of success, -1 otherwise
+ * TODO change return type
+ */
 ssize_t cb_release(struct c_buf *cb, size_t nbyte){
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
@@ -158,6 +166,14 @@ ssize_t cb_release(struct c_buf *cb, size_t nbyte){
 }
 
 /* Update: used += space_used, notify */
+/**
+ * @brief Declare some space as being used. Waiting readers
+ *        are notified when new space is acquired.
+ * @param cb Circular buffer in object
+ * @param nbyte Number of bytes to acquire
+ * @return 0 in case of success, -1 otherwise
+ * TODO change return type
+ */
 ssize_t cb_acquire(struct c_buf *cb, size_t nbyte){
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
