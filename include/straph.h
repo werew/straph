@@ -166,11 +166,6 @@ struct inslot_c {
     size_t data_read;         /* Total data read */
     size_t of_ck;             /* Offset current chunk */
 
-#ifdef false
-    unsigned int of_read;     /* Offset unread data */
-    unsigned int of_ck;       /* Offset current chunk */
-#endif
-
     /* Cache */
     char cache[SIZE_CACHE];   /* Circular buffer. Each read must 
                                  consume all the readable data storing
