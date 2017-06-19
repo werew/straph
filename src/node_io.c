@@ -88,6 +88,9 @@ ssize_t cb_releasable
     size_t of_ck, end;
   
     freedsize = 0; 
+
+    /* No need to lock the references when a writer
+       is reading them */
     of_ck = cb->data_transf % cb->sizebuf;
     end   = cb->data_written % cb->sizebuf;
 
@@ -165,7 +168,6 @@ ssize_t cb_release(struct c_buf *cb, size_t nbyte){
     return 0;
 }
 
-/* Update: used += space_used, notify */
 /**
  * @brief Declare some space as being used. Waiting readers
  *        are notified when new space is acquired.
@@ -229,11 +231,14 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
     /* Amout of data transferred to cb */
     size_written = 0;
 
+    /* No need to lock the references when a writer
+       is reading them */
+
     /* Offset from where we will start writing */
     of_start = cb->data_written % cb->sizebuf;
 
     /* Get available free space */
-    total_freespace = cb->sizebuf - (cb->data_written - cb->data_transf); // XXX Need to lock ?
+    total_freespace = cb->sizebuf - (cb->data_written - cb->data_transf);
     real_freespace  = cb_realfreespace(total_freespace);
 
     /* If the space is not enough try to free some more */
