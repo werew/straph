@@ -82,7 +82,7 @@ inline void cb_writechunk
  * @return The size occupied by releasable chunks 
  *         or -1 in case of error
  */
-ssize_t cb_genfreespace // TODO change name (doesn't really generate...)
+ssize_t cb_releasable 
 (struct c_buf *cb, ckcount_t maxreads, bool blocking){
     ssize_t freedsize;
     size_t of_ck, end;
@@ -225,7 +225,7 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
        
         /* If there isn't free space at all it's ok to wait */
         bool blocking = (real_freespace == 0);
-        if ((new_freespace = cb_genfreespace
+        if ((new_freespace = cb_releasable
                 (cb,ob->nreaders, blocking)) == -1) return -1;
 
         /* Update values if new space is available */
@@ -257,7 +257,7 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
         if (size_written >= nbyte) break;
 
         /* Free more data, waiting if necessary */
-        if ((new_freespace = cb_genfreespace
+        if ((new_freespace = cb_releasable
                 (cb,ob->nreaders, true)) == -1  ||
             /* XXX is release necessary ? */
              cb_release(cb, new_freespace) == -1 ) return -1;
