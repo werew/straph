@@ -655,18 +655,22 @@ ssize_t st_write(node n, unsigned int slot,
               const void* buf, size_t nbyte){
 
     
-    struct out_buf *ob = &n->outslots[slot];
-
-    /* XXX should a node detect NULL buffers ? */
-    /* 
-     If no slot is available (user choice) 
-     act as the write was successful 
-    */
-    if (n->nb_outslots <= slot               ||
-        n->outslots[slot].buf == NULL ){
-        return nbyte;
+    struct out_buf *ob; /* Target output buffer */
+  
+    /* Bad slot number */ 
+    if (n->nb_outslots <= slot) {
+        errno = EINVAL;
+        return -1;
     }
 
+    ob = &n->outslots[slot];
+
+    /* 
+     If no slot was allocated (user choice) 
+    */
+    if (ob->buf == NULL ) return 0;
+
+    
     switch (n->outslots[slot].type){
         case LIN_BUF: 
             return st_lbwrite(ob->buf, buf, nbyte);
