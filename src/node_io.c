@@ -217,16 +217,19 @@ size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nby
 
 
 
-
-ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
+/**
+ * @brief Writes data to a circular buffer
+ * @param
+ * @param
+ * @return
+ */
+ssize_t st_cbwrite
+(struct c_buf *cb, unsigned int nreaders, const void *buf, size_t nbyte){
 
     unsigned int of_start;
     size_t total_freespace, real_freespace;
     ssize_t new_freespace;
     size_t size_written, space_used;
-
-    /* Circular buffer */
-    struct c_buf *cb = ob->buf;
 
     /* Amout of data transferred to cb */
     size_written = 0;
@@ -246,8 +249,8 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
        
         /* If there isn't free space at all it's ok to wait */
         bool blocking = (real_freespace == 0);
-        if ((new_freespace = cb_releasable
-                (cb,ob->nreaders, blocking)) == -1) return -1;
+        if ((new_freespace = cb_releasable(cb, nreaders, blocking)) == -1) 
+            return -1;
 
         /* Update values if new space is available */
         if (new_freespace > 0){
@@ -278,8 +281,7 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
         if (size_written >= nbyte) break;
 
         /* Free more data, waiting if necessary */
-        if ((new_freespace = cb_releasable
-                (cb,ob->nreaders, true)) == -1  ||
+        if ((new_freespace = cb_releasable(cb, nreaders, true)) == -1 ||
             /* XXX is release necessary ? */
              cb_release(cb, new_freespace) == -1 ) return -1;
 
@@ -654,8 +656,10 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
 ssize_t st_write(node n, unsigned int slot, 
               const void* buf, size_t nbyte){
 
-    /* XXX should a node detect NULL buffers ? */
+    
+    struct out_buf *ob = &n->outslots[slot];
 
+    /* XXX should a node detect NULL buffers ? */
     /* 
      If no slot is available (user choice) 
      act as the write was successful 
@@ -667,11 +671,9 @@ ssize_t st_write(node n, unsigned int slot,
 
     switch (n->outslots[slot].type){
         case LIN_BUF: 
-            return st_lbwrite(&n->outslots[slot],
-                       buf, nbyte);
+            return st_lbwrite(ob, buf, nbyte);
         case CIR_BUF: 
-            return st_cbwrite(&n->outslots[slot],
-                       buf, nbyte);
+            return st_cbwrite(ob->buf, ob->nreaders, buf, nbyte);
         default: 
             errno = EINVAL;
             return -1;
