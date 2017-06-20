@@ -513,10 +513,8 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
 
 
-ssize_t st_lbwrite(struct out_buf* ob, const void* buf, size_t nbyte){
+ssize_t st_lbwrite(struct l_buf *lb, const void* buf, size_t nbyte){
 
-    /* Linear buffer */
-    struct l_buf *lb = ob->buf;
     size_t space_available;
     size_t write_size;
 
@@ -671,7 +669,7 @@ ssize_t st_write(node n, unsigned int slot,
 
     switch (n->outslots[slot].type){
         case LIN_BUF: 
-            return st_lbwrite(ob, buf, nbyte);
+            return st_lbwrite(ob->buf, buf, nbyte);
         case CIR_BUF: 
             return st_cbwrite(ob->buf, ob->nreaders, buf, nbyte);
         default: 
