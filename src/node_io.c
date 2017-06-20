@@ -629,12 +629,15 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 
 
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
+
     struct out_buf* ob;
 
-    if (n->nb_inslots <= slot        ||
-        n->inslots[slot] == NULL ){
-        return 0;
+    if (n->nb_inslots <= slot){
+        errno = EINVAL;
+        return -1;
     }
+
+    if (n->inslots[slot] == NULL ) return 0;
 
     /* Get out buffer */
     ob = ((struct inslot*) n->inslots[slot])->src;
