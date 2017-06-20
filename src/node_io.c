@@ -91,8 +91,8 @@ ssize_t cb_releasable
 
     /* No need to lock the references when a writer
        is reading them */
-    of_ck = cb->data_transf % cb->sizebuf;
-    end   = cb->data_written % cb->sizebuf;
+    of_ck = cb->ref_datatransf % cb->sizebuf;
+    end   = cb->ref_datawritten % cb->sizebuf;
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_ckcount))
 
@@ -161,7 +161,7 @@ ssize_t cb_release(struct c_buf *cb, size_t nbyte){
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
-    cb->data_transf += nbyte;
+    cb->ref_datatransf += nbyte;
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
@@ -180,7 +180,7 @@ ssize_t cb_acquire(struct c_buf *cb, size_t nbyte){
 
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
 
-    cb->data_written +=  nbyte;
+    cb->ref_datawritten +=  nbyte;
 
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
     PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_acquire))
@@ -235,10 +235,10 @@ ssize_t st_cbwrite(struct out_buf *ob, const void *buf, size_t nbyte){
        is reading them */
 
     /* Offset from where we will start writing */
-    of_start = cb->data_written % cb->sizebuf;
+    of_start = cb->ref_datawritten % cb->sizebuf;
 
     /* Get available free space */
-    total_freespace = cb->sizebuf - (cb->data_written - cb->data_transf);
+    total_freespace = cb->sizebuf - (cb->ref_datawritten - cb->ref_datatransf);
     real_freespace  = cb_realfreespace(total_freespace);
 
     /* If the space is not enough try to free some more */
@@ -442,12 +442,12 @@ size_t isc_getavailable(struct inslot_c *in){
 
     /* Wait for new data if necessary */
     PTH_ERRCK_NC(pthread_mutex_lock(&cb->lock_refs))
-        while (in->data_read >= cb->data_written){
+        while (in->data_read >= cb->ref_datawritten){
             PTH_ERRCK(pthread_cond_wait(&cb->cond_acquire, &cb->lock_refs), 
                       pthread_mutex_unlock(&cb->lock_refs);)
         }
 
-        data_available = cb->data_written - in->data_read;
+        data_available = cb->ref_datawritten - in->data_read;
     PTH_ERRCK_NC(pthread_mutex_unlock(&cb->lock_refs))
 
     return data_available;
@@ -729,8 +729,8 @@ struct c_buf* st_makecb(size_t sizebuf){
         goto error_4;
 
     b->sizebuf = sizebuf;
-    b->data_transf  = 0;
-    b->data_written = 0;
+    b->ref_datatransf  = 0;
+    b->ref_datawritten = 0;
 
     return b;
 

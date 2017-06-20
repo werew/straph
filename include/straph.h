@@ -86,8 +86,8 @@ struct c_buf {
     char* buf;                  /* Pointer to the buf */
     unsigned int sizebuf;       /* Size of the buf */
 
-    size_t data_written;        /* Total data written to buf */
-    size_t data_transf;         /* Total data writtan to the buf
+    size_t ref_datawritten;        /* Total data written to buf */
+    size_t ref_datatransf;         /* Total data writtan to the buf
                                    and consumed by all readers */
 
     pthread_mutex_t lock_ckcount;    /* Concurrent reads/writes of the 
@@ -95,7 +95,7 @@ struct c_buf {
     pthread_cond_t  cond_free;
 
     pthread_mutex_t lock_refs;       /* Concurrent reads/writes of
-                                        data_start and data_size   */
+                                        ref_datawritten and ref_datatransf */
     pthread_cond_t  cond_acquire;
 
 };
