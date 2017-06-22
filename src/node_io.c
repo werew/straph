@@ -8,8 +8,6 @@
 
 
 
-typedef enum{false,true} bool;
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
 
 
 
@@ -226,7 +224,7 @@ size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nby
  * @param
  * @return
  */
-ssize_t st_cbwrite
+ssize_t cb_write
 (struct c_buf *cb, unsigned int nreaders, const void *buf, size_t nbyte){
 
     unsigned int of_start;
@@ -301,7 +299,7 @@ ssize_t st_cbwrite
  * update the cache
  * return the size read
  */
-size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
+size_t cb_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
     size_t size2read, linear_size;
    
     /* Size that will be read from the cache */
@@ -330,8 +328,7 @@ size_t inc_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
 
 
 
-struct cb_transf cb_read
-(struct c_buf *cb, size_t data_av, 
+struct cb_transf cb_read(struct c_buf *cb, size_t data_av, 
  struct inslot_c *in, void *buf, size_t nbyte){
 
 /* BIG TODO: naming !!!!! */
@@ -405,6 +402,7 @@ struct cb_transf cb_read
 
 
 /* Increment cnt chunks from of_startck to of_endck excluded */
+/* TODO rename */
 int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
 
     int freed;
@@ -440,7 +438,7 @@ int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
     return freed;
 }
 
-
+/* TODO rename */
 size_t isc_getavailable(struct inslot_c *in){
     struct c_buf *cb = in->src->buf;
     size_t data_available;
@@ -471,7 +469,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     unsigned int cks_passed; /* Chunks completed */
 
     /* Read from cache */
-    size_read = inc_cacheread(in,buf,nbyte);
+    size_read = cb_cacheread(in,buf,nbyte);
     if (size_read >= nbyte) return size_read; 
 
     /* Read from buffer */
@@ -511,7 +509,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 }
 
 
-struct c_buf* st_makecb(size_t sizebuf){
+struct c_buf* cb_make(size_t sizebuf){
     int err;
     struct c_buf* b;
 
@@ -547,7 +545,7 @@ error_1:
     return NULL;
 }
 
-int st_destroycb(struct c_buf* b){
+int cb_destroy(struct c_buf* b){
     free(b->buf);
 
     PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_refs))
@@ -575,7 +573,7 @@ struct inslot_c* st_makeinslotc(struct out_buf* b){
 /*************************************************************/
 
 
-ssize_t st_lbwrite(struct l_buf *lb, const void* buf, size_t nbyte){
+ssize_t lb_write(struct l_buf *lb, const void* buf, size_t nbyte){
 
     size_t space_available;
     size_t write_size;
@@ -670,7 +668,7 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 }
 
 
-struct l_buf* st_makelb(size_t sizebuf){
+struct l_buf* lb_make(size_t sizebuf){
     int err;
     struct l_buf* b;
 
@@ -698,7 +696,7 @@ struct l_buf* st_makelb(size_t sizebuf){
     return b;
 }
 
-int st_destroylb(struct l_buf* b){
+int lb_destroy(struct l_buf* b){
     PTH_ERRCK_NC(pthread_mutex_destroy(&b->mutex))
     PTH_ERRCK_NC(pthread_cond_destroy(&b->cond))
 
@@ -765,9 +763,9 @@ ssize_t st_write(node n, unsigned int slot,
     
     switch (n->outslots[slot].type){
         case LIN_BUF: 
-            return st_lbwrite(ob->buf, buf, nbyte);
+            return lb_write(ob->buf, buf, nbyte);
         case CIR_BUF: 
-            return st_cbwrite(ob->buf, ob->nreaders, buf, nbyte);
+            return cb_write(ob->buf, ob->nreaders, buf, nbyte);
         default: 
             errno = EINVAL;
             return -1;
@@ -797,8 +795,8 @@ int st_bufstat(node n, unsigned int slot, int status){
 void* st_makeb(unsigned char buftype, size_t bufsize){
 
     switch (buftype){
-        case CIR_BUF: return st_makecb(bufsize);
-        case LIN_BUF: return st_makelb(bufsize);
+        case CIR_BUF: return cb_make(bufsize);
+        case LIN_BUF: return lb_make(bufsize);
         default: errno = EINVAL;
                  return NULL;
     }
@@ -807,8 +805,8 @@ void* st_makeb(unsigned char buftype, size_t bufsize){
 
 int st_destroyb(struct out_buf *buf){
     switch (buf->type){
-        case LIN_BUF: return st_destroylb(buf->buf);
-        case CIR_BUF: return st_destroycb(buf->buf);
+        case LIN_BUF: return lb_destroy(buf->buf);
+        case CIR_BUF: return cb_destroy(buf->buf);
         default: errno = EINVAL;
                  return -1;  
     }

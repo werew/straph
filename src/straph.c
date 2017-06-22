@@ -825,9 +825,9 @@ int st_ndestroy(node nd){
             if (nd->outslots[i].buf == NULL) continue;
 
             switch (nd->outslots[i].type){
-                case LIN_BUF: st_destroylb(nd->outslots[i].buf);
+                case LIN_BUF: lb_destroy(nd->outslots[i].buf);
                     break;
-                case CIR_BUF: st_destroycb(nd->outslots[i].buf);
+                case CIR_BUF: cb_destroy(nd->outslots[i].buf);
                     break;
                 default: errno = EINVAL;
                          return -1;  
