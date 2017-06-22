@@ -13,6 +13,11 @@ typedef enum{false,true} bool;
 
 
 
+/*************************************************************/
+/*                     Circular buffer                       */
+/*************************************************************/
+
+
 /**
  * @brief get the count field of a chunk (i.e. number of times
  *        the chunk was read)
@@ -247,10 +252,10 @@ ssize_t st_cbwrite
        
         /* If there isn't free space at all it's ok to wait */
         bool blocking = (real_freespace == 0);
-        if ((new_freespace = cb_releasable(cb, nreaders, blocking)) == -1) 
-            return -1;
 
         /* Update values if new space is available */
+        if ((new_freespace = cb_releasable(cb, nreaders, blocking)) == -1) 
+            return -1;
         if (new_freespace > 0){
             total_freespace += new_freespace;
             real_freespace = cb_realfreespace(total_freespace);
@@ -456,9 +461,6 @@ size_t isc_getavailable(struct inslot_c *in){
 
 
 
-
-
-
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     struct cb_transf tr; /* Transfer infos */
@@ -509,6 +511,68 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 }
 
 
+struct c_buf* st_makecb(size_t sizebuf){
+    int err;
+    struct c_buf* b;
+
+    if ((b = malloc(sizeof(struct c_buf))) == NULL) return NULL;
+    if ((b->buf = malloc(sizebuf)) == NULL){
+        free(b); return NULL;
+    }
+
+    if ((err = pthread_mutex_init(&b->lock_refs,NULL)) != 0) 
+        goto error_1;
+    if ((err = pthread_mutex_init(&b->lock_ckcount,NULL)) != 0) 
+        goto error_2;
+    if ((err = pthread_cond_init(&b->cond_free,NULL)) != 0)
+        goto error_3;
+    if ((err = pthread_cond_init(&b->cond_acquire,NULL)) != 0) 
+        goto error_4;
+
+    b->sizebuf = sizebuf;
+    b->ref_datatransf  = 0;
+    b->ref_datawritten = 0;
+
+    return b;
+
+error_4:
+    pthread_cond_destroy(&b->cond_free);
+error_3:
+    pthread_mutex_destroy(&b->lock_ckcount);
+error_2:
+    pthread_mutex_destroy(&b->lock_refs);
+error_1:
+    free(b);
+    errno = err;
+    return NULL;
+}
+
+int st_destroycb(struct c_buf* b){
+    free(b->buf);
+
+    PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_refs))
+    PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_ckcount))
+    /* TODO propertly destroy cb */
+    
+    return 0;
+}
+
+
+struct inslot_c* st_makeinslotc(struct out_buf* b){
+    struct inslot_c* is = calloc(1,sizeof(struct inslot_c));
+    if (is == NULL) return NULL;
+
+    is->src = b;
+    is->data_read = 0;
+    return is;
+}
+
+
+
+
+/*************************************************************/
+/*                     Linear buffer                         */
+/*************************************************************/
 
 
 ssize_t st_lbwrite(struct l_buf *lb, const void* buf, size_t nbyte){
@@ -560,25 +624,6 @@ int st_bufstatlb(struct l_buf* lb, int status){
     return 0; 
 }
 
-int st_bufstat(node n, unsigned int slot, int status){
-
-    if (n->nb_outslots <= slot               ||
-        n->outslots[slot].buf == NULL ){
-        errno = ENOENT;
-        return -1;
-    }
-
-    switch (n->outslots[slot].type){
-        case LIN_BUF: 
-            return st_bufstatlb(n->outslots[slot].buf, status);
-        case CIR_BUF: 
-            return 0; 
-        default: 
-            errno = EINVAL;
-            return -1;
-    }
-}
-
 
 
 
@@ -624,6 +669,52 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
     return nbyte; 
 }
 
+
+struct l_buf* st_makelb(size_t sizebuf){
+    int err;
+    struct l_buf* b;
+
+    b = malloc(sizeof(struct l_buf));
+    if (b == NULL) return NULL;
+
+    b->buf = malloc(sizebuf);
+    if (b->buf == NULL) {
+        free(b);
+        return NULL;
+    }
+
+    b->sizebuf = sizebuf;
+    b->of_empty = 0;
+    b->status = BUF_READY;
+
+    if ((err = pthread_mutex_init(&b->mutex, NULL)) != 0 ||
+        (err = pthread_cond_init(&b->cond, NULL))   != 0 ){
+        free(b->buf);
+        free(b);
+        errno = err;
+        return NULL;
+    }
+
+    return b;
+}
+
+int st_destroylb(struct l_buf* b){
+    PTH_ERRCK_NC(pthread_mutex_destroy(&b->mutex))
+    PTH_ERRCK_NC(pthread_cond_destroy(&b->cond))
+
+    free(b->buf);
+    free(b);
+    return 0;
+}
+
+struct inslot_l* st_makeinslotl(struct out_buf* b){
+    struct inslot_l* is = malloc(sizeof(struct inslot_l));
+    if (is == NULL) return NULL;
+
+    is->src = b;
+    is->of_start = 0;
+    return is;
+}
 
 
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
@@ -684,112 +775,24 @@ ssize_t st_write(node n, unsigned int slot,
 }
 
 
+int st_bufstat(node n, unsigned int slot, int status){
 
-
-struct l_buf* st_makelb(size_t sizebuf){
-    int err;
-    struct l_buf* b;
-
-    b = malloc(sizeof(struct l_buf));
-    if (b == NULL) return NULL;
-
-    b->buf = malloc(sizebuf);
-    if (b->buf == NULL) {
-        free(b);
-        return NULL;
+    if (n->nb_outslots <= slot               ||
+        n->outslots[slot].buf == NULL ){
+        errno = ENOENT;
+        return -1;
     }
 
-    b->sizebuf = sizebuf;
-    b->of_empty = 0;
-    b->status = BUF_READY;
-
-    if ((err = pthread_mutex_init(&b->mutex, NULL)) != 0 ||
-        (err = pthread_cond_init(&b->cond, NULL))   != 0 ){
-        free(b->buf);
-        free(b);
-        errno = err;
-        return NULL;
+    switch (n->outslots[slot].type){
+        case LIN_BUF: 
+            return st_bufstatlb(n->outslots[slot].buf, status);
+        case CIR_BUF: 
+            return 0; 
+        default: 
+            errno = EINVAL;
+            return -1;
     }
-
-    return b;
 }
-
-
-struct c_buf* st_makecb(size_t sizebuf){
-    int err;
-    struct c_buf* b;
-
-    if ((b = malloc(sizeof(struct c_buf))) == NULL) return NULL;
-    if ((b->buf = malloc(sizebuf)) == NULL){
-        free(b); return NULL;
-    }
-
-    if ((err = pthread_mutex_init(&b->lock_refs,NULL)) != 0) 
-        goto error_1;
-    if ((err = pthread_mutex_init(&b->lock_ckcount,NULL)) != 0) 
-        goto error_2;
-    if ((err = pthread_cond_init(&b->cond_free,NULL)) != 0)
-        goto error_3;
-    if ((err = pthread_cond_init(&b->cond_acquire,NULL)) != 0) 
-        goto error_4;
-
-    b->sizebuf = sizebuf;
-    b->ref_datatransf  = 0;
-    b->ref_datawritten = 0;
-
-    return b;
-
-error_4:
-    pthread_cond_destroy(&b->cond_free);
-error_3:
-    pthread_mutex_destroy(&b->lock_ckcount);
-error_2:
-    pthread_mutex_destroy(&b->lock_refs);
-error_1:
-    free(b);
-    errno = err;
-    return NULL;
-}
-
-struct inslot_l* st_makeinslotl(struct out_buf* b){
-    struct inslot_l* is = malloc(sizeof(struct inslot_l));
-    if (is == NULL) return NULL;
-
-    is->src = b;
-    is->of_start = 0;
-    return is;
-}
-
-struct inslot_c* st_makeinslotc(struct out_buf* b){
-    struct inslot_c* is = calloc(1,sizeof(struct inslot_c));
-    if (is == NULL) return NULL;
-
-    is->src = b;
-    is->data_read = 0;
-    return is;
-}
-
-
-
-int st_destroylb(struct l_buf* b){
-    PTH_ERRCK_NC(pthread_mutex_destroy(&b->mutex))
-    PTH_ERRCK_NC(pthread_cond_destroy(&b->cond))
-
-    free(b->buf);
-    free(b);
-    return 0;
-}
-
-int st_destroycb(struct c_buf* b){
-    free(b->buf);
-
-    PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_refs))
-    PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_ckcount))
-    /* TODO propertly destroy cb */
-    
-    return 0;
-}
-
 
 void* st_makeb(unsigned char buftype, size_t bufsize){
 
