@@ -308,6 +308,7 @@ inline cksize_t cb_getcksize(struct c_buf *cb, unsigned int of_ck);
 inline void cb_writechunk(struct c_buf *cb, size_t offset, const void *buf, cksize_t nbyte);
 ssize_t cb_releasable (struct c_buf *cb, ckcount_t maxreads, bool blocking);
 inline size_t cb_realfreespace(size_t free_space);
+int cb_release(struct c_buf *cb, size_t nbyte);
 int cb_acquire(struct c_buf *cb, size_t nbyte);
 size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nbyte);
 ssize_t cb_write(struct c_buf *cb, unsigned int nreaders, const void *buf, size_t nbyte);
