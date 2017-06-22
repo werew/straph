@@ -183,7 +183,7 @@ struct inslot_c {
 struct cb_transf {
     size_t data_size;        /* Data transferred */
     size_t real_size;        /* Total size transferred */
-    unsigned int cks_passed; /* Chunks finished */
+    unsigned int cks_passed; /* Chunks finished during this trasfer */
 };
 
 
@@ -297,12 +297,27 @@ int st_destroy(straph s);
 int st_setbuffer(node n, unsigned int idx_buf, unsigned char buftype, size_t bufsize);
 int st_nlink(node a, node b, unsigned char mode);
 int st_addflow(node a, unsigned int idx_buf, node b, unsigned int islot);
-int st_bufstat(node n, unsigned int slot, int status);
 int st_nrewind(node n);
 int st_rewind(straph st);
 
 
-/* Straph's internals */
+
+/* IO */
+
+void* st_makeb(unsigned char buftype, size_t bufsize);
+int st_destroyb(struct out_buf *buf);
+void* st_threadwrapper(void *n);
+int st_starter(struct linked_fifo *lf);
+int st_nstart(node nd);
+int st_nup(node nd);
+void st_ndown(node nd);
+
+/* User's calls */
+ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
+ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
+int st_bufstat(node n, unsigned int slot, int status);
+
+/* Circular buffer */
 inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck);
 inline cksize_t cb_getcksize(struct c_buf *cb, unsigned int of_ck);
 inline void cb_writechunk(struct c_buf *cb, size_t offset, const void *buf, cksize_t nbyte);
@@ -310,31 +325,26 @@ ssize_t cb_releasable (struct c_buf *cb, ckcount_t maxreads, bool blocking);
 inline size_t cb_realfreespace(size_t free_space);
 int cb_release(struct c_buf *cb, size_t nbyte);
 int cb_acquire(struct c_buf *cb, size_t nbyte);
+size_t cb_cacheread(struct inslot_c* in, void* buf, size_t nbyte);
 size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nbyte);
 ssize_t cb_write(struct c_buf *cb, unsigned int nreaders, const void *buf, size_t nbyte);
-size_t cb_cacheread(struct inslot_c* in, void* buf, size_t nbyte);
 struct cb_transf cb_read(struct c_buf *cb, size_t data_av, struct inslot_c *in, void *buf, size_t nbyte);
+struct c_buf* cb_make(size_t sizebuf);
+int cb_destroy(struct c_buf* b);
+
+
 int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks);
 size_t isc_getavailable(struct inslot_c *in);
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte);
-struct c_buf* cb_make(size_t sizebuf);
-int cb_destroy(struct c_buf* b);
 struct inslot_c* st_makeinslotc(struct out_buf* b);
+
+/* Linear buffer */
 ssize_t lb_write(struct l_buf *lb, const void* buf, size_t nbyte);
 int st_bufstatlb(struct l_buf* lb, int status);
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte);
 struct l_buf* lb_make(size_t sizebuf);
 int lb_destroy(struct l_buf* b);
 struct inslot_l* st_makeinslotl(struct out_buf* b);
-ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte);
-ssize_t st_write(node n, unsigned int slot, const void* buf, size_t nbyte);
-int st_bufstat(node n, unsigned int slot, int status);
-void* st_makeb(unsigned char buftype, size_t bufsize);
-int st_destroyb(struct out_buf *buf);
-int st_starter(struct linked_fifo *lf);
-int st_nstart(node nd);
-void* st_threadwrapper(void *n);
-int st_nup(node nd);
-void st_ndown(node nd);
+
 
 #endif
