@@ -107,9 +107,13 @@ typedef struct s_straph {
 } *straph;
 
 
+void* st_threadwrapper(void *n);
+int st_starter(struct linked_fifo *lf);
+int st_nstart(node nd);
+int st_nup(node nd);
+void st_ndown(node nd);
 
 
-/* Straph user's interface */
 straph st_create(void);
 node st_makenode(void* (*entry)(node));
 int st_addnode(straph g, node n);
@@ -128,11 +132,6 @@ int st_bufstat(node n, unsigned int slot, int status);
 
 
 
-void* st_threadwrapper(void *n);
-int st_starter(struct linked_fifo *lf);
-int st_nstart(node nd);
-int st_nup(node nd);
-void st_ndown(node nd);
 
 
 

@@ -503,10 +503,10 @@ int st_nup(node nd){
 
         switch (((struct out_buf*)nd->inslots[i])->type){
             case LIN_BUF:
-                islot = st_makeinslotl((struct out_buf*) nd->inslots[i]);
+                islot = cb_makeis((struct out_buf*) nd->inslots[i]);
                 break;
             case CIR_BUF:
-                islot = st_makeinslotc((struct out_buf*) nd->inslots[i]);
+                islot = lb_makeis((struct out_buf*) nd->inslots[i]);
                 break;
             default: 
                 errno = EINVAL;

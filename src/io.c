@@ -402,7 +402,7 @@ struct cb_transf cb_read(struct c_buf *cb, size_t data_av,
 
 /* Increment cnt chunks from of_startck to of_endck excluded */
 /* TODO rename */
-int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
+int isc_incrementcounts(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
 
     int freed;
     ckcount_t cnt;
@@ -433,11 +433,11 @@ int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
     if (freed > 0){
         PTH_ERRCK_NC(pthread_cond_broadcast(&cb->cond_free));
     }
-
     return freed;
 }
 
 /* TODO rename */
+/* TODO add cnditional blocking */
 size_t isc_getavailable(struct inslot_c *in){
     struct c_buf *cb = in->src->buf;
     size_t data_available;
@@ -489,7 +489,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         if (size_read >= nbyte) break;
 
         /* Mark chunks and signals free chunks */
-        isc_icc(in, of_startck, tr.cks_passed);
+        isc_incrementcounts(in, of_startck, tr.cks_passed);
     }
 
     /* 3 - Transfear remaning data to the cache */
@@ -502,7 +502,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
     }
     
     /* Mark chunks and signals free chunks */
-    isc_icc(in, of_startck, cks_passed);
+    isc_incrementcounts(in, of_startck, cks_passed);
 
     return size_read; 
 }
@@ -555,7 +555,7 @@ int cb_destroy(struct c_buf* b){
 }
 
 
-struct inslot_c* st_makeinslotc(struct out_buf* b){
+struct inslot_c* cb_makeis(struct out_buf* b){
     struct inslot_c* is = calloc(1,sizeof(struct inslot_c));
     if (is == NULL) return NULL;
 
@@ -704,7 +704,7 @@ int lb_destroy(struct l_buf* b){
     return 0;
 }
 
-struct inslot_l* st_makeinslotl(struct out_buf* b){
+struct inslot_l* lb_makeis(struct out_buf* b){
     struct inslot_l* is = malloc(sizeof(struct inslot_l));
     if (is == NULL) return NULL;
 

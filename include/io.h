@@ -200,7 +200,7 @@ int cb_destroy(struct c_buf* b);
 int isc_icc(struct inslot_c* isc, size_t of_startck, unsigned int ncks);
 size_t isc_getavailable(struct inslot_c *in);
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte);
-struct inslot_c* st_makeinslotc(struct out_buf* b);
+struct inslot_c* cb_makeis(struct out_buf* b);
 
 
 /* Linear buffer */
@@ -209,6 +209,6 @@ int st_bufstatlb(struct l_buf* lb, int status);
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte);
 struct l_buf* lb_make(size_t sizebuf);
 int lb_destroy(struct l_buf* b);
-struct inslot_l* st_makeinslotl(struct out_buf* b);
+struct inslot_l* lb_makeis(struct out_buf* b);
 
 #endif
