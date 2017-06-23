@@ -3,6 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include "straph.h"
+#include "io.h"
 
 /* TODO set better naming conventions */
 /* TODO improve code readablility  */
