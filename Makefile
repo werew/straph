@@ -1,11 +1,14 @@
-# Project name
-TARGET = straph
 
 # Folders 
 OBJDIR = obj
 BINDIR = bin
 SRCDIR = src
 INCDIR = include
+LIBDIR = lib
+
+# Targets
+STATICLIB = $(LIBDIR)/libstraph.a
+SHAREDLIB = $(LIBDIR)/libstraph.so
 
 # Compiler
 CC = gcc
@@ -18,33 +21,43 @@ CFLAGS = -pthread     \
          -std=gnu99   \
          -g
 
+
 # Files
-SOURCES := $(wildcard $(SRCDIR)/*.c)
-INCLUDES := $(INCDIR)/*.h
-OBJECTS := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) 
+SOURCES := io.c             \
+           linked_fifo.c    \
+           straph.c
+SOURCES := $(addprefix $(SRCDIR)/,$(SOURCES))
+
+INCLUDES := common.h        \
+            io.h            \
+            linked_fifo.h   \
+            straph.h        
+INCLUDES := $(addprefix $(INCDIR)/,$(INCLUDES))
+
+OBJECTS := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+
 DEP = $(OBJECTS:%.o=%.d)
-EXECUTABLE := $(BINDIR)/$(TARGET)
 
 
 
-$(TARGET): $(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJECTS)
-	@echo "\n-----------------> Linking ... "
-	@mkdir -p $(BINDIR)
-	$(CC) $(CFLAGS) $^ -o $@
 
+
+
+
+lib: $(STATICLIB)
 
 # Dependencies to the headers are
 # covered by this include
 -include $(DEP) 		
 
+$(STATICLIB): $(OBJECTS)
+	@mkdir -p $(LIBDIR)
+	ar rcs $@ $(OBJECTS)
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
-	@echo "\n-----------------> Compiling $@ ... "
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 clean:
-	@echo "----------------- Cleaning -----------------"
-	rm -f $(OBJECTS) $(EXECUTABLE) 
+	rm -f $(OBJECTS) $(STATICLIB) $(SHAREDLIB)
