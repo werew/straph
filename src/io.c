@@ -192,6 +192,10 @@ int cb_acquire(struct c_buf *cb, size_t nbyte){
 /**
  * @brief writes directly data into cb (as chunks) without
  *        any previous check (the space is supposed to be free)
+ * @param cb Pointer to a circular buffer
+ * @param of_start Offset from where start writing
+ * @param buf A buffer containing the data to write
+ * @param nbyte Number of bytes to write
  * @return space used
  */
 size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nbyte){
@@ -220,9 +224,11 @@ size_t cb_dowrite(struct c_buf *cb, size_t of_start, const void *buf, size_t nby
 
 /**
  * @brief Writes data to a circular buffer
- * @param
- * @param
- * @return
+ * @param cb Pointer to a circular buffer
+ * @param nreaders Number of readers 
+ * @param buf A buffer containing the data to write
+ * @param nbyte Number of bytes to write
+ * @return the number of bytes written into the buf
  */
 ssize_t cb_write
 (struct c_buf *cb, unsigned int nreaders, const void *buf, size_t nbyte){
@@ -295,9 +301,12 @@ ssize_t cb_write
 }
 
 
-/* Read as much as possible from the cache
- * update the cache
- * return the size read
+/**
+ * @brief Read as much data as possible (up to nbyte) from the cache
+ * @param in Input slot 
+ * @param buf Buffer where to write the data
+ * @param nbyte Max size of the read in bytes 
+ * return the number of bytes transferred
  */
 size_t cb_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
     size_t size2read, linear_size;
@@ -327,6 +336,20 @@ size_t cb_cacheread(struct inslot_c* in, void* buf, size_t nbyte){
 
 
 
+/**
+ * @brief 
+ * @param cb Circular buffer where to read from
+ * @param data_av Data available (for read) on the circular buffer
+ * @param in Input slot 
+ * @param buf Buffer where to transfer the read data
+ * @param nbyte Number of bytes to read
+ * @return
+ */
+ /* XXX 
+    1) what about taking data_av out of the parameter and check it
+    directly inside this function ? 
+    2) the return type is quite messy, is there any better way ?
+ */
 struct cb_transf cb_read(struct c_buf *cb, size_t data_av, 
  struct inslot_c *in, void *buf, size_t nbyte){
 
@@ -359,7 +382,7 @@ struct cb_transf cb_read(struct c_buf *cb, size_t data_av,
             /* Can read all the remaining ck */
             linear_size = of_ckend - of_read;
         } else {
-            /* Read first contiguos part of the ck */
+            /* Read first contiguous part of the ck */
             linear_size = cb->sizebuf - of_read;
         }
 
@@ -401,7 +424,13 @@ struct cb_transf cb_read(struct c_buf *cb, size_t data_av,
 
 
 /* Increment cnt chunks from of_startck to of_endck excluded */
-/* TODO rename */
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 int isc_incrementcounts(struct inslot_c* isc, size_t of_startck, unsigned int ncks){
 
     int freed;
@@ -437,7 +466,14 @@ int isc_incrementcounts(struct inslot_c* isc, size_t of_startck, unsigned int nc
 }
 
 /* TODO rename */
-/* TODO add cnditional blocking */
+/* TODO add conditional blocking */
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 size_t isc_getavailable(struct inslot_c *in){
     struct c_buf *cb = in->src->buf;
     size_t data_available;
@@ -458,6 +494,13 @@ size_t isc_getavailable(struct inslot_c *in){
 
 
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
 
     struct cb_transf tr; /* Transfer infos */
@@ -492,7 +535,7 @@ ssize_t st_cbread(struct inslot_c* in, void* buf, size_t nbyte){
         isc_incrementcounts(in, of_startck, tr.cks_passed);
     }
 
-    /* 3 - Transfear remaning data to the cache */
+    /* 3 - Transfer remaining data to the cache */
     cks_passed = tr.cks_passed;
     if (data_av > 0){
         tr = cb_read(cb, data_av, in, &in->cache[in->of_cdata], SIZE_CACHE);
@@ -549,7 +592,7 @@ int cb_destroy(struct c_buf* b){
 
     PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_refs))
     PTH_ERRCK_NC(pthread_mutex_destroy(&b->lock_ckcount))
-    /* TODO propertly destroy cb */
+    /* TODO properly destroy cb */
     
     return 0;
 }
@@ -572,6 +615,13 @@ struct inslot_c* cb_makeis(struct out_buf* b){
 /*************************************************************/
 
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 ssize_t lb_write(struct l_buf *lb, const void* buf, size_t nbyte){
 
     size_t space_available;
@@ -603,6 +653,13 @@ ssize_t lb_write(struct l_buf *lb, const void* buf, size_t nbyte){
     return nbyte; 
 }
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 int st_bufstatlb(struct l_buf* lb, int status){
     /* Update offset */
     int err;
@@ -624,6 +681,13 @@ int st_bufstatlb(struct l_buf* lb, int status){
 
 
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 
     /* Source buffer */
@@ -667,6 +731,13 @@ ssize_t st_readlb(struct inslot_l* in, void* buf, size_t nbyte){
 }
 
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 struct l_buf* lb_make(size_t sizebuf){
     int err;
     struct l_buf* b;
@@ -695,6 +766,13 @@ struct l_buf* lb_make(size_t sizebuf){
     return b;
 }
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 int lb_destroy(struct l_buf* b){
     PTH_ERRCK_NC(pthread_mutex_destroy(&b->mutex))
     PTH_ERRCK_NC(pthread_cond_destroy(&b->cond))
@@ -704,6 +782,13 @@ int lb_destroy(struct l_buf* b){
     return 0;
 }
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 struct inslot_l* lb_makeis(struct out_buf* b){
     struct inslot_l* is = malloc(sizeof(struct inslot_l));
     if (is == NULL) return NULL;
@@ -714,6 +799,13 @@ struct inslot_l* lb_makeis(struct out_buf* b){
 }
 
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
 
     struct out_buf* ob;
@@ -740,6 +832,13 @@ ssize_t st_read(node n, unsigned int slot, void* buf, size_t nbyte){
     }
 }
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 ssize_t st_write(node n, unsigned int slot, 
               const void* buf, size_t nbyte){
 
@@ -772,6 +871,13 @@ ssize_t st_write(node n, unsigned int slot,
 }
 
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 int st_bufstat(node n, unsigned int slot, int status){
 
     if (n->nb_outslots <= slot               ||
@@ -791,6 +897,13 @@ int st_bufstat(node n, unsigned int slot, int status){
     }
 }
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 void* st_makeb(unsigned char buftype, size_t bufsize){
 
     switch (buftype){
@@ -802,6 +915,13 @@ void* st_makeb(unsigned char buftype, size_t bufsize){
 
 }
 
+/**
+ * @brief
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 int st_destroyb(struct out_buf *buf){
     switch (buf->type){
         case LIN_BUF: return lb_destroy(buf->buf);
