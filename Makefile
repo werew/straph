@@ -15,8 +15,8 @@ CFLAGS = -pthread     \
          -Wextra      \
          -Werror      \
          -I $(INCDIR) \
+         -std=gnu99   \
          -g
-        # -std=c99     \
 
 # Files
 SOURCES := $(wildcard $(SRCDIR)/*.c)
