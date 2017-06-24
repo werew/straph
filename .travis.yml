@@ -1,2 +1,6 @@
 language: c
 script: make
+notifications:
+    slack:
+        on_success: change
+        on_failure: always
