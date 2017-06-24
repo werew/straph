@@ -23,7 +23,7 @@
  * @param of_ck Offset to the chunk
  * @return The number of times the chunk was read
  */
-inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck){
+static inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck){
     ckcount_t s;
     CB_READUI16(cb,of_ck,&s);
     return s;
@@ -36,17 +36,33 @@ inline ckcount_t cb_getckcount(struct c_buf *cb, unsigned int of_ck){
  * @param of_ck Offset to the chunk
  * @return Size of the chunk in bytes
  */
-inline cksize_t cb_getcksize(struct c_buf *cb, unsigned int of_ck){
+static inline cksize_t cb_getcksize(struct c_buf *cb, unsigned int of_ck){
     cksize_t s;
     CB_READUI16(cb,of_ck+2,&s);
     return s;
 }
 
 
+/**
+ * @brief Calculate the effective space available for
+ *        data transfer by calculation the number of chunks 
+ *        needed and subtracting the size of the headers
+ * @param free_space Total free space       
+ * @return Effective free space for data transfer
+ */
+static inline size_t cb_realfreespace(size_t free_space){
+    size_t min_chunks;
+
+    if (free_space <= SIZE_CKHEAD) return 0;
+    min_chunks = (free_space+MAX_CKSIZE-1) / MAX_CKSIZE;
+    return free_space - SIZE_CKHEAD*min_chunks;
+}
+
+
 /* Note: Does not update of_lastck */
 /* Note: Does not check for free space*/
 /* Note: Supposes that bufsize > nbyte */
-inline void cb_writechunk
+static inline void cb_writechunk
 (struct c_buf *cb, size_t offset, const void *buf, cksize_t nbyte){
 
     cksize_t linear_size;
@@ -135,20 +151,6 @@ ssize_t cb_releasable
 
 
 
-/**
- * @brief Calculate the effective space available for
- *        data transfer by calculation the number of chunks 
- *        needed and subtracting the size of the headers
- * @param free_space Total free space       
- * @return Effective free space for data transfer
- */
-inline size_t cb_realfreespace(size_t free_space){
-    size_t min_chunks;
-
-    if (free_space <= SIZE_CKHEAD) return 0;
-    min_chunks = (free_space+MAX_CKSIZE-1) / MAX_CKSIZE;
-    return free_space - SIZE_CKHEAD*min_chunks;
-}
 
 
 /**
