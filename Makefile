@@ -72,10 +72,7 @@ alltests: $(TESTS)
 
 $(TESTS): % : $(TESTDIR)/%.t
 	@echo "Running test: $@"
-	@(./$< 2>&1 > $(TESTDIR)/log.$@ && \
-	echo "----> OK") || echo "----> FAILED"
-
-	
+	@./$< 2>&1 > $(TESTDIR)/log.$@ && echo "----> OK" 
 
 clean:
 	rm -f $(OBJECTS) $(STATICLIB) $(SHAREDLIB) $(TESTSBIN) $(TESTDIR)/log.*
