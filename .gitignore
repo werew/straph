@@ -40,5 +40,7 @@
 straph
 
 # Folders
-bin/
+test/*.t
+test/log.*
+lib/
 obj/
