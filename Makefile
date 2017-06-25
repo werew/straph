@@ -5,6 +5,7 @@ BINDIR = bin
 SRCDIR = src
 INCDIR = include
 LIBDIR = lib
+TESTDIR= test
 
 # Targets
 STATICLIB = $(LIBDIR)/libstraph.a
@@ -38,6 +39,9 @@ OBJECTS := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 DEP = $(OBJECTS:%.o=%.d)
 
+TESTS := $(notdir $(basename $(wildcard $(TESTDIR)/*.c)))
+TESTSBIN := $(addsuffix .t, $(addprefix $(TESTDIR)/, $(TESTS)))
+
 
 
 
@@ -59,5 +63,20 @@ $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
+$(TESTSBIN): $(TESTDIR)/%.t : $(TESTDIR)/%.c $(STATICLIB) 
+	$(CC) -static $< $(CFLAGS) -L$(LIBDIR) -lstraph -o $@
+
+.PHONY: alltests $(TESTS)
+
+alltests: $(TESTS)
+
+$(TESTS): % : $(TESTDIR)/%.t
+	@echo "Running test: $@"
+	@(./$< 2>&1 > $(TESTDIR)/log.$@ && \
+	echo "----> OK") || echo "----> FAILED"
+
+	
+
 clean:
-	rm -f $(OBJECTS) $(STATICLIB) $(SHAREDLIB)
+	rm -f $(OBJECTS) $(STATICLIB) $(SHAREDLIB) $(TESTSBIN) $(TESTDIR)/log.*
+
