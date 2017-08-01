@@ -55,6 +55,7 @@ lib: $(STATICLIB)
 # covered by this include
 -include $(DEP) 		
 
+# Create archive
 $(STATICLIB): $(OBJECTS)
 	@mkdir -p $(LIBDIR)
 	ar rcs $@ $(OBJECTS)
@@ -63,13 +64,16 @@ $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
+# Tests binaries (of the form testname.t)
 $(TESTSBIN): $(TESTDIR)/%.t : $(TESTDIR)/%.c $(STATICLIB) 
 	$(CC) $< $(CFLAGS) -L$(LIBDIR) -lstraph -o $@
 
 .PHONY: alltests $(TESTS)
 
+# Perform all tests
 alltests: $(TESTS)
 
+# Perform a particular test (this will generate a log)
 $(TESTS): % : $(TESTDIR)/%.t
 	@echo "Running test: $@"
 	@./$< 2>&1 > $(TESTDIR)/log.$@ && echo "----> OK" 
