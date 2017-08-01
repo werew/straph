@@ -28,11 +28,11 @@ void* nodewrite(node n){
 }
 
 void* readandprint(node n){
-    char buf;
+    char buf = 0;
     st_read(n,0,&buf,1);
-    printf("%c %x\n",buf,buf);
+    printf("%c\n",buf);
     if (buf == 'A') return NULL;
-    else return (void*) 0xff;
+    else return (void*) 1;
 }
 
 int main(void){
@@ -43,6 +43,7 @@ int main(void){
 
     st_addnode(s, n1);
     st_nlink(n1,n2,SEQ_MODE);
+    st_setbuffer(n1,0,LIN_BUF,1);
     st_addflow(n1,0,n2,0);
     st_start(s);
     st_join(s);
