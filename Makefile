@@ -64,7 +64,7 @@ $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 $(TESTSBIN): $(TESTDIR)/%.t : $(TESTDIR)/%.c $(STATICLIB) 
-	$(CC) -static $< $(CFLAGS) -L$(LIBDIR) -lstraph -o $@
+	$(CC) $< $(CFLAGS) -L$(LIBDIR) -lstraph -o $@
 
 .PHONY: alltests $(TESTS)
 
